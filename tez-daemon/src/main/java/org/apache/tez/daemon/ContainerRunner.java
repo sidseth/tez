@@ -20,5 +20,5 @@ import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos;
 
 public interface ContainerRunner {
 
-  void queueContainer(TezDaemonProtocolProtos.RunContainerRequest request) throws IOException;
+  void queueContainer(TezDaemonProtocolProtos.RunContainerRequestProto request) throws IOException;
 }

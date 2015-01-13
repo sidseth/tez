@@ -40,7 +40,7 @@ import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.util.AuxiliaryServiceHelper;
 import org.apache.log4j.Logger;
 import org.apache.tez.daemon.ContainerRunner;
-import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequest;
+import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequestProto;
 import org.apache.tez.dag.api.TezConstants;
 import org.apache.tez.runtime.api.ExecutionContext;
 import org.apache.tez.runtime.api.impl.ExecutionContextImpl;
@@ -75,7 +75,8 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
         new ThreadFactoryBuilder().setNameFormat("ContainerExecutor %d").build());
     this.executorService = MoreExecutors.listeningDecorator(raw);
     AuxiliaryServiceHelper.setServiceDataIntoEnv(
-        TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID, ByteBuffer.allocate(4).putInt(localShufflePort), localEnv);
+        TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID,
+        ByteBuffer.allocate(4).putInt(localShufflePort), localEnv);
   }
 
   @Override
@@ -107,7 +108,8 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
   }
 
   @Override
-  public void queueContainer(RunContainerRequest request) throws IOException {
+  public void queueContainer(RunContainerRequestProto request) throws IOException {
+    LOG.info("Queing container for execution: " + request);
 
     Map<String, String> env = new HashMap<String, String>();
     // TODO What else is required in this environment map.
@@ -116,8 +118,9 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     String[] localDirs = new String[localDirsBase.length];
 
     // Setup up local dirs to be application specific, and create them.
-    for (int i = 0 ; i < localDirsBase.length ; i++) {
-      localDirs[i] = createAppSpecificLocalDir(localDirsBase[i], request.getApplicationIdString(), processUser);
+    for (int i = 0; i < localDirsBase.length; i++) {
+      localDirs[i] = createAppSpecificLocalDir(localDirsBase[i], request.getApplicationIdString(),
+          processUser);
       localFs.mkdirs(new Path(localDirs[i]));
     }
     LOG.info("DEBUG: Dirs are: " + Arrays.toString(localDirs));
@@ -139,7 +142,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
 
   static class ContainerRunnerCallable implements Callable<ContainerExecutionResult> {
 
-    private final RunContainerRequest request;
+    private final RunContainerRequestProto request;
     private final Configuration conf;
     private final String workingDir;
     private final String[] localDirs;
@@ -150,7 +153,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     private final ExecutionContext executionContext;
 
 
-    ContainerRunnerCallable(RunContainerRequest request, Configuration conf,
+    ContainerRunnerCallable(RunContainerRequestProto request, Configuration conf,
                             ExecutionContext executionContext, Map<String, String> envMap,
                             String[] localDirs, String workingDir) {
       this.request = request;
@@ -165,8 +168,10 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     @Override
     public ContainerExecutionResult call() throws Exception {
       TezChild tezChild =
-          new TezChild(conf, request.getAmHost(), request.getAmPort(), request.getContainerIdString(),
-              request.getTokenIdentifier(), request.getAppAttemptNumber(), workingDir, localDirs, envMap, objectRegistry, pid,
+          new TezChild(conf, request.getAmHost(), request.getAmPort(),
+              request.getContainerIdString(),
+              request.getTokenIdentifier(), request.getAppAttemptNumber(), workingDir, localDirs,
+              envMap, objectRegistry, pid,
               executionContext);
       return tezChild.run();
     }
@@ -174,9 +179,9 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
 
   final class ContainerRunnerCallback implements FutureCallback<ContainerExecutionResult> {
 
-    private final RunContainerRequest request;
+    private final RunContainerRequestProto request;
 
-    ContainerRunnerCallback(RunContainerRequest request) {
+    ContainerRunnerCallback(RunContainerRequestProto request) {
       this.request = request;
     }
 
@@ -185,16 +190,22 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     public void onSuccess(ContainerExecutionResult result) {
       switch (result.getExitStatus()) {
         case SUCCESS:
-          LOG.info("Successfully finished: " + request.getApplicationIdString() + ", containerId=" + request.getContainerIdString());
+          LOG.info("Successfully finished: " + request.getApplicationIdString() + ", containerId=" +
+              request.getContainerIdString());
           break;
         case EXECUTION_FAILURE:
-          LOG.info("Failed to run: " + request.getApplicationIdString() + ", containerId=" + request.getContainerIdString(), result.getThrowable());
+          LOG.info("Failed to run: " + request.getApplicationIdString() + ", containerId=" +
+              request.getContainerIdString(), result.getThrowable());
           break;
         case INTERRUPTED:
-          LOG.info("Interrupted while running: " + request.getApplicationIdString() + ", containerId=" + request.getContainerIdString(), result.getThrowable());
+          LOG.info(
+              "Interrupted while running: " + request.getApplicationIdString() + ", containerId=" +
+                  request.getContainerIdString(), result.getThrowable());
           break;
         case ASKED_TO_DIE:
-          LOG.info("Asked to die while running: " + request.getApplicationIdString() + ", containerId=" + request.getContainerIdString());
+          LOG.info(
+              "Asked to die while running: " + request.getApplicationIdString() + ", containerId=" +
+                  request.getContainerIdString());
           break;
       }
     }

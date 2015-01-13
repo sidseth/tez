@@ -14,9 +14,11 @@
 
 package org.apache.tez.daemon;
 
+import java.io.IOException;
+
 import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos;
 
 public interface ContainerRunner {
 
-  void queueContainer(TezDaemonProtocolProtos.RunContainerRequest request);
+  void queueContainer(TezDaemonProtocolProtos.RunContainerRequest request) throws IOException;
 }

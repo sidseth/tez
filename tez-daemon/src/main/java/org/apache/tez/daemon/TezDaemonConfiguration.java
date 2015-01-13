@@ -42,6 +42,7 @@ public class TezDaemonConfiguration extends Configuration {
 
   public static final String TEZ_DAEMON_WORK_DIRS = TEZ_DAEMON_PREFIX + "work.dirs";
 
+  public static final String TEZ_DAEMON_YARN_SHUFFLE_PORT = TEZ_DAEMON_PREFIX + "yarn.shuffle.port";
 
 
 }

@@ -17,6 +17,7 @@ package org.apache.tez.daemon.impl;
 import static org.mockito.Mockito.*;
 
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.protobuf.ServiceException;
 import org.apache.hadoop.conf.Configuration;
@@ -32,16 +33,21 @@ public class TestTezDaemonProtocolServerImpl {
   @Test(timeout = 10000)
   public void test() throws ServiceException {
     TezDaemonConfiguration daemonConf = new TezDaemonConfiguration();
-    TezDaemonProtocolServerImpl server = new TezDaemonProtocolServerImpl(daemonConf, mock(
-        ContainerRunner.class));
+    TezDaemonProtocolServerImpl server =
+        new TezDaemonProtocolServerImpl(daemonConf, mock(ContainerRunner.class),
+            new AtomicReference<InetSocketAddress>());
 
     try {
       server.init(new Configuration());
       server.start();
       InetSocketAddress serverAddr = server.getBindAddress();
 
-      TezDaemonProtocolBlockingPB client = new TezDaemonProtocolClientImpl(new Configuration(), serverAddr.getHostName(), serverAddr.getPort());
-      client.runContainer(null, TezDaemonProtocolProtos.RunContainerRequest.newBuilder().setAmHost("amhost").setAmPort(2000).build());
+      TezDaemonProtocolBlockingPB client =
+          new TezDaemonProtocolClientImpl(new Configuration(), serverAddr.getHostName(),
+              serverAddr.getPort());
+      client.runContainer(null,
+          TezDaemonProtocolProtos.RunContainerRequest.newBuilder().setAmHost("amhost")
+              .setAmPort(2000).build());
 
     } finally {
       server.stop();

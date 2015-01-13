@@ -15,16 +15,20 @@
 package org.apache.tez.daemon.impl;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
+import java.util.Arrays;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.log4j.Logger;
+import org.apache.tez.daemon.ContainerRunner;
 import org.apache.tez.daemon.TezDaemonConfiguration;
 import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos;
 
-public class TezDaemon extends AbstractService {
+public class TezDaemon extends AbstractService implements ContainerRunner {
 
   private static final Logger LOG = Logger.getLogger(TezDaemon.class);
 
@@ -33,34 +37,50 @@ public class TezDaemon extends AbstractService {
   private final int rpcPort;
   private final TezDaemonProtocolServerImpl server;
   private final ContainerRunnerImpl containerRunner;
+  private final String[] localDirs;
+  private final int shufflePort;
+  // TODO Not the best way to share the address
+  private final AtomicReference<InetSocketAddress> address = new AtomicReference<InetSocketAddress>();
 
   private final BlockingQueue<TezDaemonProtocolProtos.RunContainerRequest> pendingContainers =
       new LinkedBlockingQueue<TezDaemonProtocolProtos.RunContainerRequest>();
 
   public TezDaemon(TezDaemonConfiguration daemonConf) {
     super("TezDaemon");
-    this.numExecutors = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS, TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS_DEFAULT);
-    this.rpcPort = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT, TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT_DEFAULT);
+    this.numExecutors = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS,
+        TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS_DEFAULT);
+    this.rpcPort = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT,
+        TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT_DEFAULT);
     this.daemonConf = daemonConf;
-    this.containerRunner = new ContainerRunnerImpl(numExecutors);
-    this.server = new TezDaemonProtocolServerImpl(daemonConf, containerRunner);
+    this.localDirs = daemonConf.getStrings(TezDaemonConfiguration.TEZ_DAEMON_WORK_DIRS);
+    this.shufflePort = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_YARN_SHUFFLE_PORT, -1);
+
+    LOG.info("TezDaemon started with the following configuration: " +
+        "numExecutors=" + numExecutors +
+        ", rpcListenerPort=" + rpcPort +
+        ", workDirs=" + Arrays.toString(localDirs) +
+        ", shufflePort=" + shufflePort);
+
+    this.server = new TezDaemonProtocolServerImpl(daemonConf, this, address);
+    this.containerRunner = new ContainerRunnerImpl(numExecutors, localDirs, shufflePort, address, System.getenv("user.name"));
   }
 
   @Override
   public void serviceInit(Configuration conf) {
-    containerRunner.init(conf);
     server.init(conf);
+    containerRunner.init(conf);
   }
 
   @Override
   public void serviceStart() {
-    containerRunner.start();
     server.start();
+    containerRunner.start();
+
   }
 
   public void serviceStop() {
-    server.stop();
     containerRunner.stop();
+    server.stop();
   }
 
 
@@ -76,4 +96,8 @@ public class TezDaemon extends AbstractService {
   }
 
 
+  @Override
+  public void queueContainer(TezDaemonProtocolProtos.RunContainerRequest request) throws IOException {
+    containerRunner.queueContainer(request);
+  }
 }

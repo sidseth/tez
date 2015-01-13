@@ -25,6 +25,8 @@ import org.apache.hadoop.ipc.RPC;
 import org.apache.hadoop.net.NetUtils;
 import org.apache.tez.daemon.TezDaemonProtocolBlockingPB;
 import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos;
+import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequestProto;
+import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerResponseProto;
 
 // TODO Change all this to be based on a regular interface instead of relying on the Proto service - Exception signatures cannot be controlled without this for the moment.
 
@@ -36,15 +38,14 @@ public class TezDaemonProtocolClientImpl implements TezDaemonProtocolBlockingPB 
   TezDaemonProtocolBlockingPB proxy;
 
 
-
   public TezDaemonProtocolClientImpl(Configuration conf, String hostname, int port) {
     this.conf = conf;
     this.serverAddr = NetUtils.createSocketAddr(hostname, port);
   }
 
   @Override
-  public TezDaemonProtocolProtos.RunContainerResponse runContainer(RpcController controller,
-                                                                   TezDaemonProtocolProtos.RunContainerRequest request) throws
+  public RunContainerResponseProto runContainer(RpcController controller,
+                                                RunContainerRequestProto request) throws
       ServiceException {
     try {
       return getProxy().runContainer(null, request);
@@ -52,9 +53,6 @@ public class TezDaemonProtocolClientImpl implements TezDaemonProtocolBlockingPB 
       throw new ServiceException(e);
     }
   }
-
-
-
 
 
   public TezDaemonProtocolBlockingPB getProxy() throws IOException {
@@ -68,7 +66,8 @@ public class TezDaemonProtocolClientImpl implements TezDaemonProtocolBlockingPB 
     TezDaemonProtocolBlockingPB p;
     // TODO Fix security
     RPC.setProtocolEngine(conf, TezDaemonProtocolBlockingPB.class, ProtobufRpcEngine.class);
-    p = (TezDaemonProtocolBlockingPB) RPC.getProxy(TezDaemonProtocolBlockingPB.class, 0, serverAddr, conf);
+    p = (TezDaemonProtocolBlockingPB) RPC
+        .getProxy(TezDaemonProtocolBlockingPB.class, 0, serverAddr, conf);
     return p;
   }
 }

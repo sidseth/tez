@@ -17,16 +17,15 @@ package org.apache.tez.daemon.impl;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.Arrays;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.log4j.Logger;
 import org.apache.tez.daemon.ContainerRunner;
 import org.apache.tez.daemon.TezDaemonConfiguration;
-import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos;
+import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequestProto;
 
 public class TezDaemon extends AbstractService implements ContainerRunner {
 
@@ -41,9 +40,6 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
   private final int shufflePort;
   // TODO Not the best way to share the address
   private final AtomicReference<InetSocketAddress> address = new AtomicReference<InetSocketAddress>();
-
-  private final BlockingQueue<TezDaemonProtocolProtos.RunContainerRequest> pendingContainers =
-      new LinkedBlockingQueue<TezDaemonProtocolProtos.RunContainerRequest>();
 
   public TezDaemon(TezDaemonConfiguration daemonConf) {
     super("TezDaemon");
@@ -60,6 +56,13 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
         ", rpcListenerPort=" + rpcPort +
         ", workDirs=" + Arrays.toString(localDirs) +
         ", shufflePort=" + shufflePort);
+
+    Preconditions.checkArgument(this.numExecutors > 0);
+    Preconditions.checkArgument(this.rpcPort > 1024 && this.rpcPort < 65536,
+        "RPC Port must be between 1025 and 65534");
+    Preconditions.checkArgument(this.localDirs != null && this.localDirs.length > 0,
+        "Work dirs must be specified");
+    Preconditions.checkArgument(this.shufflePort > 0, "ShufflePort must be specified");
 
     this.server = new TezDaemonProtocolServerImpl(daemonConf, this, address);
     this.containerRunner = new ContainerRunnerImpl(numExecutors, localDirs, shufflePort, address, System.getenv("user.name"));
@@ -97,7 +100,7 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
 
 
   @Override
-  public void queueContainer(TezDaemonProtocolProtos.RunContainerRequest request) throws IOException {
+  public void queueContainer(RunContainerRequestProto request) throws IOException {
     containerRunner.queueContainer(request);
   }
 }

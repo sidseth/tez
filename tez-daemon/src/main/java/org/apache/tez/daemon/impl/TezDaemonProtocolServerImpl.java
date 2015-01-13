@@ -34,8 +34,11 @@ import org.apache.tez.daemon.ContainerRunner;
 import org.apache.tez.daemon.TezDaemonConfiguration;
 import org.apache.tez.daemon.TezDaemonProtocolBlockingPB;
 import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos;
+import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequestProto;
+import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerResponseProto;
 
-public class TezDaemonProtocolServerImpl extends AbstractService implements TezDaemonProtocolBlockingPB {
+public class TezDaemonProtocolServerImpl extends AbstractService
+    implements TezDaemonProtocolBlockingPB {
 
   private static final Log LOG = LogFactory.getLog(TezDaemonProtocolServerImpl.class);
 
@@ -45,7 +48,9 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
   private final AtomicReference<InetSocketAddress> bindAddress;
 
 
-  public TezDaemonProtocolServerImpl(TezDaemonConfiguration daemonConf, ContainerRunner containerRunner, AtomicReference<InetSocketAddress> address) {
+  public TezDaemonProtocolServerImpl(TezDaemonConfiguration daemonConf,
+                                     ContainerRunner containerRunner,
+                                     AtomicReference<InetSocketAddress> address) {
     super("TezDaemonProtocolServerImpl");
     this.daemonConf = daemonConf;
     this.containerRunner = containerRunner;
@@ -53,8 +58,8 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
   }
 
   @Override
-  public TezDaemonProtocolProtos.RunContainerResponse runContainer(RpcController controller,
-                                                                   TezDaemonProtocolProtos.RunContainerRequest request) throws
+  public RunContainerResponseProto runContainer(RpcController controller,
+                                                RunContainerRequestProto request) throws
       ServiceException {
     LOG.info("Received request: " + request);
     try {
@@ -62,19 +67,21 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
     } catch (IOException e) {
       throw new ServiceException(e);
     }
-    return TezDaemonProtocolProtos.RunContainerResponse.getDefaultInstance();
+    return RunContainerResponseProto.getDefaultInstance();
   }
-
 
 
   @Override
   public void serviceStart() {
     Configuration conf = getConfig();
 
-    int numHandlers = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_NUM_HANDLERS, TezDaemonConfiguration.TEZ_DAEMON_RPC_NUM_HANDLERS_DEFAULT);
-    int port = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT, TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT_DEFAULT);
+    int numHandlers = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_NUM_HANDLERS,
+        TezDaemonConfiguration.TEZ_DAEMON_RPC_NUM_HANDLERS_DEFAULT);
+    int port = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT,
+        TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT_DEFAULT);
     InetSocketAddress addr = new InetSocketAddress(port);
-    LOG.info("Attempting to start TezDaemonProtocol on port=" + port + ", with numHandlers=" + numHandlers);
+    LOG.info("Attempting to start TezDaemonProtocol on port=" + port + ", with numHandlers=" +
+        numHandlers);
 
     try {
       server = createServer(TezDaemonProtocolBlockingPB.class, addr, conf, numHandlers,
@@ -105,7 +112,8 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
     return this.bindAddress.get();
   }
 
-  private RPC.Server createServer(Class<?> pbProtocol, InetSocketAddress addr, Configuration conf, int numHandlers, BlockingService blockingService) throws
+  private RPC.Server createServer(Class<?> pbProtocol, InetSocketAddress addr, Configuration conf,
+                                  int numHandlers, BlockingService blockingService) throws
       IOException {
     RPC.setProtocolEngine(conf, pbProtocol, ProtobufRpcEngine.class);
     RPC.Server server = new RPC.Builder(conf)

@@ -21,7 +21,7 @@ option java_outer_classname = "TezDaemonProtocolProtos";
 option java_generic_services = true;
 option java_generate_equals_and_hash = true;
 
-message RunContainerRequest {
+message RunContainerRequestProto {
   optional string container_id_string = 1;
   optional string am_host = 2;
   optional int32 am_port = 3;
@@ -32,9 +32,9 @@ message RunContainerRequest {
   optional int32 app_attempt_number = 8;
 }
 
-message RunContainerResponse {
+message RunContainerResponseProto {
 }
 
 service TezDaemonProtocol {
-  rpc runContainer(RunContainerRequest) returns (RunContainerResponse);
+  rpc runContainer(RunContainerRequestProto) returns (RunContainerResponseProto);
 }

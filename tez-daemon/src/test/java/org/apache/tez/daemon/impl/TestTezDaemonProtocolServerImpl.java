@@ -24,7 +24,7 @@ import org.apache.hadoop.conf.Configuration;
 import org.apache.tez.daemon.ContainerRunner;
 import org.apache.tez.daemon.TezDaemonConfiguration;
 import org.apache.tez.daemon.TezDaemonProtocolBlockingPB;
-import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos;
+import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequestProto;
 import org.junit.Test;
 
 public class TestTezDaemonProtocolServerImpl {
@@ -46,7 +46,7 @@ public class TestTezDaemonProtocolServerImpl {
           new TezDaemonProtocolClientImpl(new Configuration(), serverAddr.getHostName(),
               serverAddr.getPort());
       client.runContainer(null,
-          TezDaemonProtocolProtos.RunContainerRequest.newBuilder().setAmHost("amhost")
+          RunContainerRequestProto.newBuilder().setAmHost("amhost")
               .setAmPort(2000).build());
 
     } finally {

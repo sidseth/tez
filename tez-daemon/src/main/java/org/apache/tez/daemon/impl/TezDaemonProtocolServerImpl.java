@@ -16,6 +16,7 @@ package org.apache.tez.daemon.impl;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.protobuf.BlockingService;
@@ -41,13 +42,14 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
   private final TezDaemonConfiguration daemonConf;
   private final ContainerRunner containerRunner;
   private RPC.Server server;
-  private InetSocketAddress bindAddress;
+  private final AtomicReference<InetSocketAddress> bindAddress;
 
 
-  public TezDaemonProtocolServerImpl(TezDaemonConfiguration daemonConf, ContainerRunner containerRunner) {
+  public TezDaemonProtocolServerImpl(TezDaemonConfiguration daemonConf, ContainerRunner containerRunner, AtomicReference<InetSocketAddress> address) {
     super("TezDaemonProtocolServerImpl");
     this.daemonConf = daemonConf;
     this.containerRunner = containerRunner;
+    this.bindAddress = address;
   }
 
   @Override
@@ -55,7 +57,11 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
                                                                    TezDaemonProtocolProtos.RunContainerRequest request) throws
       ServiceException {
     LOG.info("Received request: " + request);
-    containerRunner.queueContainer(request);
+    try {
+      containerRunner.queueContainer(request);
+    } catch (IOException e) {
+      throw new ServiceException(e);
+    }
     return TezDaemonProtocolProtos.RunContainerResponse.getDefaultInstance();
   }
 
@@ -80,9 +86,9 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
     }
 
     InetSocketAddress serverBindAddress = NetUtils.getConnectAddress(server);
-    this.bindAddress = NetUtils.createSocketAddrForHost(
+    this.bindAddress.set(NetUtils.createSocketAddrForHost(
         serverBindAddress.getAddress().getCanonicalHostName(),
-        serverBindAddress.getPort());
+        serverBindAddress.getPort()));
     LOG.info("Instantiated TezDaemonProtocol at " + bindAddress);
   }
 
@@ -96,7 +102,7 @@ public class TezDaemonProtocolServerImpl extends AbstractService implements TezD
   @InterfaceAudience.Private
   @VisibleForTesting
   InetSocketAddress getBindAddress() {
-    return this.bindAddress;
+    return this.bindAddress.get();
   }
 
   private RPC.Server createServer(Class<?> pbProtocol, InetSocketAddress addr, Configuration conf, int numHandlers, BlockingService blockingService) throws

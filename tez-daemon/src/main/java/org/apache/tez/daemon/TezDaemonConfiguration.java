@@ -37,8 +37,7 @@ public class TezDaemonConfiguration extends Configuration {
 
   public static final String TEZ_DAEMON_HOSTNAME = TEZ_DAEMON_PREFIX + "hostname";
 
-  public static final String TEZ_DAEMON_RPC_PORT = TEZ_DAEMON_PREFIX + "rpc.port";
-  public static final int TEZ_DAEMON_RPC_PORT_DEFAULT = 15001;
+
 
   public static final String TEZ_DAEMON_RPC_NUM_HANDLERS = TEZ_DAEMON_PREFIX + "rpc.num.handlers";
   public static final int TEZ_DAEMON_RPC_NUM_HANDLERS_DEFAULT = 5;
@@ -51,6 +50,8 @@ public class TezDaemonConfiguration extends Configuration {
   // Section for configs used in AM and executors
   public static final String TEZ_DAEMON_NUM_EXECUTORS = TEZ_DAEMON_PREFIX + "num.executors";
   public static final int TEZ_DAEMON_NUM_EXECUTORS_DEFAULT = 3;
+  public static final String TEZ_DAEMON_RPC_PORT = TEZ_DAEMON_PREFIX + "rpc.port";
+  public static final int TEZ_DAEMON_RPC_PORT_DEFAULT = 15001;
 
 
   // Section for configs used in the AM //
@@ -61,5 +62,7 @@ public class TezDaemonConfiguration extends Configuration {
   public static final int TEZ_DAEMON_AM_VCPUS_PER_INSTANCE_DEFAULT = 4;
   public static final String TEZ_DAEMON_AM_SERVICE_HOSTS = TEZ_DAEMON_AM_PREFIX + "service.hosts";
   public static final String TEZ_DAEMON_AM_SERVICE_HOSTS_DEFAULT = "localhost";
+  public static final String TEZ_DAEMON_AM_COMMUNICATOR_NUM_THREADS = TEZ_DAEMON_AM_PREFIX + "communicator.num.threads";
+  public static final int TEZ_DAEMON_AM_COMMUNICATOR_NUM_THREADS_DEFAULT = 5;
 
 }

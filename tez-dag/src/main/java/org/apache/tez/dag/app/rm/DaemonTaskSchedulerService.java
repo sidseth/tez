@@ -14,8 +14,10 @@
 
 package org.apache.tez.dag.app.rm;
 
+import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Random;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,6 +45,7 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
   private final AppContext appContext;
   private final List<String> serviceHosts;
   private final ContainerFactory containerFactory;
+  private final Random random = new Random();
 
   // Per daemon
   private final int memoryPerInstance;
@@ -103,10 +106,18 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
   }
 
   @Override
+  public void serviceStop() {
+    appCallbackExecutor.shutdownNow();
+  }
+
+
+
+  @Override
   public Resource getAvailableResources() {
     // TODO This needs information about all running executors, and the amount of memory etc available across the cluster.
     return Resource
-        .newInstance(Ints.checkedCast(serviceHosts.size() * memoryPerInstance), serviceHosts.size() * coresPerInstance);
+        .newInstance(Ints.checkedCast(serviceHosts.size() * memoryPerInstance),
+            serviceHosts.size() * coresPerInstance);
   }
 
   @Override
@@ -121,7 +132,8 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
   @Override
   public Resource getTotalResources() {
     return Resource
-        .newInstance(Ints.checkedCast(serviceHosts.size() * memoryPerInstance), serviceHosts.size() * coresPerInstance);
+        .newInstance(Ints.checkedCast(serviceHosts.size() * memoryPerInstance),
+            serviceHosts.size() * coresPerInstance);
   }
 
   @Override
@@ -137,14 +149,18 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
   @Override
   public void allocateTask(Object task, Resource capability, String[] hosts, String[] racks,
                            Priority priority, Object containerSignature, Object clientCookie) {
-    // TODO Change this to match the hosts and allocate on multiple nodes to work for a multi-node setup
-    appClientDelegate.taskAllocated(task, clientCookie, containerFactory.createContainer(resourcePerExecutor, priority));
+    String host = selectHost(hosts);
+    appClientDelegate.taskAllocated(task, clientCookie,
+        containerFactory.createContainer(resourcePerExecutor, priority, host));
   }
+
 
   @Override
   public void allocateTask(Object task, Resource capability, ContainerId containerId,
                            Priority priority, Object containerSignature, Object clientCookie) {
-    appClientDelegate.taskAllocated(task, clientCookie, containerFactory.createContainer(resourcePerExecutor, priority));
+    String host = selectHost(null);
+    appClientDelegate.taskAllocated(task, clientCookie,
+        containerFactory.createContainer(resourcePerExecutor, priority, host));
   }
 
   @Override
@@ -181,6 +197,19 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
         appCallbackExecutor);
   }
 
+  private String selectHost(String[] requestedHosts) {
+    String host = null;
+    if (requestedHosts != null && requestedHosts.length > 0) {
+      Arrays.sort(requestedHosts);
+      host = requestedHosts[0];
+      LOG.info("Selected host: " + host + " from requested hosts: " + Arrays.toString(requestedHosts));
+    } else {
+      host = serviceHosts.get(random.nextInt(serviceHosts.size()));
+      LOG.info("Selected random host: " + host + " since the request contained no host information");
+    }
+    return host;
+  }
+
   static class ContainerFactory {
     final AppContext appContext;
     AtomicInteger nextId;
@@ -190,11 +219,11 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
       this.nextId = new AtomicInteger(1);
     }
 
-    public Container createContainer(Resource capability, Priority priority) {
+    public Container createContainer(Resource capability, Priority priority, String hostname) {
       ApplicationAttemptId appAttemptId = appContext.getApplicationAttemptId();
       ContainerId containerId = ContainerId.newInstance(appAttemptId, nextId.getAndIncrement());
-      NodeId nodeId = NodeId.newInstance("127.0.0.1", 0);
-      String nodeHttpAddress = "127.0.0.1:0";
+      NodeId nodeId = NodeId.newInstance(hostname, 0);
+      String nodeHttpAddress = "hostname:0";
 
       Container container = Container.newInstance(containerId,
           nodeId,

@@ -145,6 +145,7 @@ public class TezChild {
     this.objectRegistry = objectRegistry;
 
     // Security framework already loaded the tokens into current ugi
+    // TODO KKK Tokens need to be setup explicitly in TezChild
     Credentials credentials = UserGroupInformation.getCurrentUser().getCredentials();
     if (LOG.isDebugEnabled()) {
       LOG.debug("Executing with tokens:");

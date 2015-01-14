@@ -35,6 +35,8 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.DataInputBuffer;
+import org.apache.hadoop.security.Credentials;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.util.AuxiliaryServiceHelper;
@@ -115,6 +117,9 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     // TODO What else is required in this environment map.
     env.putAll(localEnv);
     env.put(ApplicationConstants.Environment.USER.name(), request.getUser());
+
+    // TODO KKK Add shuffle service data.
+
     String[] localDirs = new String[localDirsBase.length];
 
     // Setup up local dirs to be application specific, and create them.
@@ -132,11 +137,17 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     // Setting this up correctly is more from framework components to setup security, ping intervals, etc.
     String workingDir = localDirs[0];
 
+    Credentials credentials = new Credentials();
+    DataInputBuffer dib = new DataInputBuffer();
+    byte[] tokenBytes = request.getCredentialsBinary().toByteArray();
+    dib.reset(tokenBytes, tokenBytes.length);
+    credentials.readTokenStorageStream(dib);
+
 
     ListenableFuture<ContainerExecutionResult> future = executorService
         .submit(new ContainerRunnerCallable(request, new Configuration(getConfig()),
             new ExecutionContextImpl(localAddress.get().getHostName()), env, localDirs,
-            workingDir));
+            workingDir, credentials));
     Futures.addCallback(future, new ContainerRunnerCallback(request));
   }
 
@@ -151,11 +162,12 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     private final String pid = null;
     private final ObjectRegistryImpl objectRegistry;
     private final ExecutionContext executionContext;
+    private final Credentials credentials;
 
 
     ContainerRunnerCallable(RunContainerRequestProto request, Configuration conf,
                             ExecutionContext executionContext, Map<String, String> envMap,
-                            String[] localDirs, String workingDir) {
+                            String[] localDirs, String workingDir, Credentials credentials) {
       this.request = request;
       this.conf = conf;
       this.executionContext = executionContext;
@@ -163,6 +175,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
       this.workingDir = workingDir;
       this.localDirs = localDirs;
       this.objectRegistry = new ObjectRegistryImpl();
+      this.credentials = credentials;
     }
 
     @Override
@@ -173,6 +186,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
               request.getTokenIdentifier(), request.getAppAttemptNumber(), workingDir, localDirs,
               envMap, objectRegistry, pid,
               executionContext);
+      // TODO KKK Make use of credentials - TezChld should not be using them from the currentUgi
       return tezChild.run();
     }
   }

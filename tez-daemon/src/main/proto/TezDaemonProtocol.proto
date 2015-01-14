@@ -26,7 +26,7 @@ message RunContainerRequestProto {
   optional string am_host = 2;
   optional int32 am_port = 3;
   optional string token_identifier = 4;
-  optional bytes am_token = 5;
+  optional bytes credentials_binary = 5;
   optional string user = 6;
   optional string application_id_string = 7;
   optional int32 app_attempt_number = 8;

@@ -972,4 +972,8 @@ public class TezConfiguration extends Configuration {
       + "allow.disabled.timeline-domains";
   public static final boolean TEZ_AM_ALLOW_DISABLED_TIMELINE_DOMAINS_DEFAULT = false;
 
+
+  // Temporary configuration parameters
+  public static final String TEZ_DAEMON_MODE = TEZ_PREFIX + "daemon.mode";
+  public static final boolean TEZ_DAEMON_MODE_DEFAULT = false;
 }

@@ -36,6 +36,9 @@ import org.apache.hadoop.yarn.api.records.Resource;
 import org.apache.tez.daemon.TezDaemonConfiguration;
 import org.apache.tez.dag.app.AppContext;
 
+
+// TODO Registration with RM - so that the AM is considered dead and restarted in the expiry interval - 10 minutes.
+
 public class DaemonTaskSchedulerService extends TaskSchedulerService {
 
   private static final Log LOG = LogFactory.getLog(DaemonTaskSchedulerService.class);
@@ -60,26 +63,25 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
                                     Configuration conf) {
     // Accepting configuration here to allow setting up fields as final
     super(DaemonTaskSchedulerService.class.getName());
-    TezDaemonConfiguration daemonConf = new TezDaemonConfiguration(conf);
     this.appCallbackExecutor = createAppCallbackExecutorService();
     this.appClientDelegate = createAppCallbackDelegate(appClient);
     this.appContext = appContext;
     this.serviceHosts = new LinkedList<String>();
     this.containerFactory = new ContainerFactory(appContext);
-    this.memoryPerInstance = daemonConf
+    this.memoryPerInstance = conf
         .getInt(TezDaemonConfiguration.TEZ_DAEMON_AM_MEMORY_PER_INSTANCE_MB,
             TezDaemonConfiguration.TEZ_DAEMON_AM_MEMORY_PER_INSTANCE_MB_DEFAULT);
-    this.coresPerInstance = daemonConf
+    this.coresPerInstance = conf
         .getInt(TezDaemonConfiguration.TEZ_DAEMON_AM_VCPUS_PER_INSTANCE,
             TezDaemonConfiguration.TEZ_DAEMON_AM_VCPUS_PER_INSTANCE_DEFAULT);
-    this.executorsPerInstance = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS,
+    this.executorsPerInstance = conf.getInt(TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS,
         TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS_DEFAULT);
 
     int memoryPerExecutor = (int) (memoryPerInstance / (float) executorsPerInstance);
     int coresPerExecutor = (int) (coresPerInstance / (float) executorsPerInstance);
     this.resourcePerExecutor = Resource.newInstance(memoryPerExecutor, coresPerExecutor);
 
-    String[] hosts = daemonConf.getStrings(TezDaemonConfiguration.TEZ_DAEMON_AM_SERVICE_HOSTS);
+    String[] hosts = conf.getStrings(TezDaemonConfiguration.TEZ_DAEMON_AM_SERVICE_HOSTS);
     if (hosts == null || hosts.length == 0) {
       hosts = new String[]{"localhost"};
     }

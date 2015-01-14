@@ -69,10 +69,9 @@ public class DaemonContainerLauncher extends AbstractService implements Containe
 
   // Configuration passed in here to set up final parameters
   public DaemonContainerLauncher(AppContext appContext, Configuration conf,
-                                 BlockingQueue<NMCommunicatorEvent> eventQueue,
-                                 TaskAttemptListener tal, Clock clock) {
+                                 TaskAttemptListener tal) {
     super(DaemonContainerLauncher.class.getName());
-    this.clock = clock;
+    this.clock = appContext.getClock();
     // TODO Scale this based on numDaemons / threads per daemon
     int numThreads = conf.getInt(TezDaemonConfiguration.TEZ_DAEMON_AM_COMMUNICATOR_NUM_THREADS,
         TezDaemonConfiguration.TEZ_DAEMON_AM_COMMUNICATOR_NUM_THREADS_DEFAULT);

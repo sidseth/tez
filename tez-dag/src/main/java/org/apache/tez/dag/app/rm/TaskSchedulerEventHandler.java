@@ -314,9 +314,15 @@ public class TaskSchedulerEventHandler extends AbstractService
       String trackingUrl, AppContext appContext) {
     boolean isLocal = getConfig().getBoolean(TezConfiguration.TEZ_LOCAL_MODE,
         TezConfiguration.TEZ_LOCAL_MODE_DEFAULT);
+    boolean isDaemon = getConfig().getBoolean(TezConfiguration.TEZ_DAEMON_MODE, TezConfiguration.TEZ_DAEMON_MODE_DEFAULT);
+    if (isDaemon) {
+      isLocal = false;
+    }
     if (isLocal) {
       return new LocalTaskSchedulerService(this, this.containerSignatureMatcher,
           host, port, trackingUrl, appContext);
+    } else if (isDaemon) {
+      return new DaemonTaskSchedulerService(this, appContext, getConfig());
     }
     else {
       return new YarnTaskSchedulerService(this, this.containerSignatureMatcher,

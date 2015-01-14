@@ -133,6 +133,7 @@ import org.apache.tez.dag.app.dag.event.VertexEventType;
 import org.apache.tez.dag.app.dag.impl.DAGImpl;
 import org.apache.tez.dag.app.launcher.ContainerLauncher;
 import org.apache.tez.dag.app.launcher.ContainerLauncherImpl;
+import org.apache.tez.dag.app.launcher.DaemonContainerLauncher;
 import org.apache.tez.dag.app.launcher.LocalContainerLauncher;
 import org.apache.tez.dag.app.rm.AMSchedulerEventType;
 import org.apache.tez.dag.app.rm.NMCommunicatorEventType;
@@ -229,6 +230,7 @@ public class DAGAppMaster extends AbstractService {
   private final int maxAppAttempts;
 
   private boolean isLocal = false; //Local mode flag
+  private boolean isDaemon = false;
 
   @VisibleForTesting
   protected DAGAppMasterShutdownHandler shutdownHandler;
@@ -315,6 +317,11 @@ public class DAGAppMaster extends AbstractService {
     this.amConf = conf;
     this.isLocal = conf.getBoolean(TezConfiguration.TEZ_LOCAL_MODE,
         TezConfiguration.TEZ_LOCAL_MODE_DEFAULT);
+    this.isDaemon =
+        conf.getBoolean(TezConfiguration.TEZ_DAEMON_MODE, TezConfiguration.TEZ_DAEMON_MODE_DEFAULT);
+    if (this.isDaemon) {
+      this.isLocal = false;
+    }
 
     boolean disableVersionCheck = conf.getBoolean(
         TezConfiguration.TEZ_AM_DISABLE_CLIENT_VERSION_CHECK,
@@ -913,6 +920,8 @@ public class DAGAppMaster extends AbstractService {
       createContainerLauncher(final AppContext context) throws UnknownHostException {
     if(isLocal){
       return new LocalContainerLauncher(context, taskAttemptListener, workingDirectory);
+    } else if (isDaemon) {
+      return new DaemonContainerLauncher(context, getConfig(), taskAttemptListener);
     } else {
       return new ContainerLauncherImpl(context);
     }

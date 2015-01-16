@@ -51,6 +51,11 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
     this.localDirs = daemonConf.getStrings(TezDaemonConfiguration.TEZ_DAEMON_WORK_DIRS);
     this.shufflePort = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_YARN_SHUFFLE_PORT, -1);
 
+    long memoryAvailableBytes = this.daemonConf
+        .getInt(TezDaemonConfiguration.TEZ_DAEMON_MEMORY_PER_INSTANCE_MB,
+            TezDaemonConfiguration.TEZ_DAEMON_MEMORY_PER_INSTANCE_MB_DEFAULT) * 1024l * 1024l;
+    long jvmMax = Runtime.getRuntime().maxMemory();
+
     LOG.info("TezDaemon started with the following configuration: " +
         "numExecutors=" + numExecutors +
         ", rpcListenerPort=" + rpcPort +
@@ -63,9 +68,13 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
     Preconditions.checkArgument(this.localDirs != null && this.localDirs.length > 0,
         "Work dirs must be specified");
     Preconditions.checkArgument(this.shufflePort > 0, "ShufflePort must be specified");
+    Preconditions.checkState(jvmMax >= memoryAvailableBytes,
+        "Invalid configuration. Xmx value too small. maxAvailable=" + jvmMax + ", configured=" +
+            memoryAvailableBytes);
 
     this.server = new TezDaemonProtocolServerImpl(daemonConf, this, address);
-    this.containerRunner = new ContainerRunnerImpl(numExecutors, localDirs, shufflePort, address, System.getenv("user.name"));
+    this.containerRunner = new ContainerRunnerImpl(numExecutors, localDirs, shufflePort, address,
+        System.getenv("user.name"), memoryAvailableBytes);
   }
 
   @Override

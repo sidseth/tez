@@ -26,6 +26,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google.common.base.Preconditions;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -62,11 +63,15 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
   private final Map<String, String> localEnv = new HashMap<String, String>();
   private final String processUser;
   private volatile FileSystem localFs;
+  private final long memoryPerExecutor;
   // TODO Support for removing queued containers, interrupting / killing specific containers
 
   public ContainerRunnerImpl(int numExecutors, String[] localDirsBase, int localShufflePort,
-                             AtomicReference<InetSocketAddress> localAddress, String processUser) {
+                             AtomicReference<InetSocketAddress> localAddress, String processUser,
+                             long totalMemoryAvailableBytes) {
     super("ContainerRunnerImpl");
+    Preconditions.checkState(numExecutors > 0,
+        "Invalid number of executors: " + numExecutors + ". Must be > 0");
     this.numExecutors = numExecutors;
     this.localDirsBase = localDirsBase;
     this.localShufflePort = localShufflePort;
@@ -79,6 +84,14 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     AuxiliaryServiceHelper.setServiceDataIntoEnv(
         TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID,
         ByteBuffer.allocate(4).putInt(localShufflePort), localEnv);
+
+    // 80% of memory considered for accounted buffers. Rest for objects.
+    // TODO Tune this based on the available size.
+    this.memoryPerExecutor = (long)(totalMemoryAvailableBytes * 0.8 / (float) numExecutors);
+
+    LOG.info("ContainerRunnerImpl config: " +
+        "memoryPerExecutorDerviced=" + memoryPerExecutor
+    );
   }
 
   @Override
@@ -147,7 +160,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     ListenableFuture<ContainerExecutionResult> future = executorService
         .submit(new ContainerRunnerCallable(request, new Configuration(getConfig()),
             new ExecutionContextImpl(localAddress.get().getHostName()), env, localDirs,
-            workingDir, credentials));
+            workingDir, credentials, memoryPerExecutor));
     Futures.addCallback(future, new ContainerRunnerCallback(request));
   }
 
@@ -163,11 +176,13 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     private final ObjectRegistryImpl objectRegistry;
     private final ExecutionContext executionContext;
     private final Credentials credentials;
+    private final long memoryAvailable;
 
 
     ContainerRunnerCallable(RunContainerRequestProto request, Configuration conf,
                             ExecutionContext executionContext, Map<String, String> envMap,
-                            String[] localDirs, String workingDir, Credentials credentials) {
+                            String[] localDirs, String workingDir, Credentials credentials,
+                            long memoryAvailable) {
       this.request = request;
       this.conf = conf;
       this.executionContext = executionContext;
@@ -176,6 +191,8 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
       this.localDirs = localDirs;
       this.objectRegistry = new ObjectRegistryImpl();
       this.credentials = credentials;
+      this.memoryAvailable = memoryAvailable;
+
     }
 
     @Override
@@ -185,8 +202,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
               request.getContainerIdString(),
               request.getTokenIdentifier(), request.getAppAttemptNumber(), workingDir, localDirs,
               envMap, objectRegistry, pid,
-              executionContext);
-      // TODO KKK Make use of credentials - TezChld should not be using them from the currentUgi
+              executionContext, credentials, memoryAvailable);
       return tezChild.run();
     }
   }

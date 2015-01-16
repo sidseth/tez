@@ -69,11 +69,11 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
     this.serviceHosts = new LinkedList<String>();
     this.containerFactory = new ContainerFactory(appContext);
     this.memoryPerInstance = conf
-        .getInt(TezDaemonConfiguration.TEZ_DAEMON_AM_MEMORY_PER_INSTANCE_MB,
-            TezDaemonConfiguration.TEZ_DAEMON_AM_MEMORY_PER_INSTANCE_MB_DEFAULT);
+        .getInt(TezDaemonConfiguration.TEZ_DAEMON_MEMORY_PER_INSTANCE_MB,
+            TezDaemonConfiguration.TEZ_DAEMON_MEMORY_PER_INSTANCE_MB_DEFAULT);
     this.coresPerInstance = conf
-        .getInt(TezDaemonConfiguration.TEZ_DAEMON_AM_VCPUS_PER_INSTANCE,
-            TezDaemonConfiguration.TEZ_DAEMON_AM_VCPUS_PER_INSTANCE_DEFAULT);
+        .getInt(TezDaemonConfiguration.TEZ_DAEMON_VCPUS_PER_INSTANCE,
+            TezDaemonConfiguration.TEZ_DAEMON_VCPUS_PER_INSTANCE_DEFAULT);
     this.executorsPerInstance = conf.getInt(TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS,
         TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS_DEFAULT);
 

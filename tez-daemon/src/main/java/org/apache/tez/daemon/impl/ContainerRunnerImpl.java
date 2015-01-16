@@ -157,12 +157,12 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     dib.reset(tokenBytes, tokenBytes.length);
     credentials.readTokenStorageStream(dib);
 
-
+    ContainerRunnerCallable callable = new ContainerRunnerCallable(request, new Configuration(getConfig()),
+        new ExecutionContextImpl(localAddress.get().getHostName()), env, localDirs,
+        workingDir, credentials, memoryPerExecutor);
     ListenableFuture<ContainerExecutionResult> future = executorService
-        .submit(new ContainerRunnerCallable(request, new Configuration(getConfig()),
-            new ExecutionContextImpl(localAddress.get().getHostName()), env, localDirs,
-            workingDir, credentials, memoryPerExecutor));
-    Futures.addCallback(future, new ContainerRunnerCallback(request));
+        .submit(callable);
+    Futures.addCallback(future, new ContainerRunnerCallback(request, callable));
   }
 
   static class ContainerRunnerCallable implements Callable<ContainerExecutionResult> {
@@ -178,6 +178,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     private final ExecutionContext executionContext;
     private final Credentials credentials;
     private final long memoryAvailable;
+    private volatile TezChild tezChild;
 
 
     ContainerRunnerCallable(RunContainerRequestProto request, Configuration conf,
@@ -198,7 +199,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
 
     @Override
     public ContainerExecutionResult call() throws Exception {
-      TezChild tezChild =
+      tezChild =
           new TezChild(conf, request.getAmHost(), request.getAmPort(),
               request.getContainerIdString(),
               request.getTokenIdentifier(), request.getAppAttemptNumber(), workingDir, localDirs,
@@ -206,14 +207,21 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
               executionContext, credentials, memoryAvailable);
       return tezChild.run();
     }
+
+    public TezChild getTezChild() {
+      return this.tezChild;
+    }
   }
 
   final class ContainerRunnerCallback implements FutureCallback<ContainerExecutionResult> {
 
     private final RunContainerRequestProto request;
+    private final ContainerRunnerCallable containerRunnerCallable;
 
-    ContainerRunnerCallback(RunContainerRequestProto request) {
+    ContainerRunnerCallback(RunContainerRequestProto request,
+                            ContainerRunnerCallable containerRunnerCallable) {
       this.request = request;
+      this.containerRunnerCallable = containerRunnerCallable;
     }
 
     // TODO Slightly more useful error handling
@@ -246,6 +254,10 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
       LOG.error(
           "TezChild execution failed for : " + request.getApplicationIdString() + ", containerId=" +
               request.getContainerIdString());
+      TezChild tezChild = containerRunnerCallable.getTezChild();
+      if (tezChild != null) {
+        tezChild.shutdown();
+      }
     }
   }
 }

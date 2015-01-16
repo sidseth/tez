@@ -19,6 +19,8 @@ import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -63,6 +65,8 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
   private final int clientPort;
   private final String trackingUrl;
   private final AtomicBoolean isStopped = new AtomicBoolean(false);
+  private final ConcurrentMap<Object, ContainerId> runningTasks =
+      new ConcurrentHashMap<Object, ContainerId>();
 
   private final AMRMClientAsync<AMRMClient.ContainerRequest> amRmClient;
 
@@ -192,8 +196,9 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
   public void allocateTask(Object task, Resource capability, String[] hosts, String[] racks,
                            Priority priority, Object containerSignature, Object clientCookie) {
     String host = selectHost(hosts);
-    appClientDelegate.taskAllocated(task, clientCookie,
-        containerFactory.createContainer(resourcePerExecutor, priority, host));
+    Container container = containerFactory.createContainer(resourcePerExecutor, priority, host);
+    runningTasks.put(task, container.getId());
+    appClientDelegate.taskAllocated(task, clientCookie, container);
   }
 
 
@@ -201,13 +206,21 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
   public void allocateTask(Object task, Resource capability, ContainerId containerId,
                            Priority priority, Object containerSignature, Object clientCookie) {
     String host = selectHost(null);
-    appClientDelegate.taskAllocated(task, clientCookie,
-        containerFactory.createContainer(resourcePerExecutor, priority, host));
+    Container container = containerFactory.createContainer(resourcePerExecutor, priority, host);
+    runningTasks.put(task, container.getId());
+    appClientDelegate.taskAllocated(task, clientCookie, container);
   }
 
   @Override
   public boolean deallocateTask(Object task, boolean taskSucceeded) {
-    LOG.info("DEBUG: Ignoring deallocateTask for task: " + task + ", with successStatus:" + taskSucceeded);
+    ContainerId containerId = runningTasks.remove(task);
+    if (containerId == null) {
+      LOG.error("Could not determine ContainerId for task: " + task +
+          " . Could have hit a race condition. Ignoring." +
+          " The query may hang since this \"unknown\" container is now taking up a slot permanently");
+      return false;
+    }
+    appClientDelegate.containerBeingReleased(containerId);
     return true;
   }
 

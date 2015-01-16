@@ -48,11 +48,17 @@ LOG_LEVEL_DEFAULT="INFO,console"
 # CLASSPATH initially contains $HADOOP_CONF_DIR & $YARN_CONF_DIR
 if [ ! -d "$HADOOP_CONF_DIR" ]; then
   echo No HADOOP_CONF_DIR set. 
-  echo Please specify it either in yarn-env.sh or in the environment.
+  echo Please specify it in the environment.
   exit 1
 fi
 
-CLASSPATH=`hadoop classpath`:.
+if [ ! -d "${TEZ_PREFIX}" ]; then
+  echo No TEZ_PREFIX set. 
+  echo Please specify it in the environment.
+  exit 1
+fi
+
+CLASSPATH=${TEZ_PREFIX}/*:${TEZ_PREFIX}/lib/*:`hadoop classpath`:.
 
 if [ -n "TEZ_DAEMON_USER_CLASSPATH" ]; then
   CLASSPATH=${CLASSPATH}:${TEZ_DAEMON_USER_CLASSPATH}

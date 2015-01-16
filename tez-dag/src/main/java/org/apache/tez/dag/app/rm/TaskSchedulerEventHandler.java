@@ -322,7 +322,7 @@ public class TaskSchedulerEventHandler extends AbstractService
       return new LocalTaskSchedulerService(this, this.containerSignatureMatcher,
           host, port, trackingUrl, appContext);
     } else if (isDaemon) {
-      return new DaemonTaskSchedulerService(this, appContext, getConfig());
+      return new DaemonTaskSchedulerService(this, appContext, host, port, trackingUrl, getConfig());
     }
     else {
       return new YarnTaskSchedulerService(this, this.containerSignatureMatcher,

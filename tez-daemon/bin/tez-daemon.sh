@@ -20,7 +20,7 @@
 #   TEZ_DAEMON_USER_CLASSPATH
 #   TEZ_DAEMON_HEAPSIZE - MB
 #   TEZ_DAEMON_OPTS - additional options
-#   TEZ_DEAMON_LOGGER - default is INFO,console
+#   TEZ_DAEMON_LOGGER - default is INFO,console
 #   TEZ_DAEMON_LOG_DIR - defaults to /tmp
 #   TEZ_DAEMON_LOG_FILE - 
 
@@ -44,6 +44,7 @@ shift
 
 JAVA=$JAVA_HOME/bin/java
 LOG_LEVEL_DEFAULT="INFO,console"
+JAVA_OPTS_BASE="-server -Djava.net.preferIPv4Stack=true -XX:+UseNUMA -XX:+UseParallelGC -XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps"
 
 # CLASSPATH initially contains $HADOOP_CONF_DIR & $YARN_CONF_DIR
 if [ ! -d "$HADOOP_CONF_DIR" ]; then
@@ -56,6 +57,11 @@ if [ ! -d "${TEZ_PREFIX}" ]; then
   echo No TEZ_PREFIX set. 
   echo Please specify it in the environment.
   exit 1
+fi
+
+if [ ! -n "${TEZ_DAEMON_LOGGER}" ]; then
+  echo "TEZ_DAEMON_LOGGER not defined... using defaults"
+  TEZ_DAEMON_LOGGER=${LOG_LEVEL_DEFAULT}
 fi
 
 CLASSPATH=${TEZ_PREFIX}/*:${TEZ_PREFIX}/lib/*:`hadoop classpath`:.
@@ -85,12 +91,12 @@ elif [ "$COMMAND" = "run" ] ; then
   CLASS='org.apache.tez.daemon.impl.TezDaemon'
 fi
 
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dhadoop.log.dir=${TEZ_DAEMON_LOG_DIR}"
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dhadoop.log.file=${TEZ_DAEMON_LOG_FILE}"
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dhadoop.root.logger=${TEZ_DAEMON_LOGGER:-${LOG_LEVEL_DEFAULT}}"
+TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} ${JAVA_OPTS_BASE}"
+TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dlog4j.configuration=tez-daemon-log4j.properties"
+TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dtez.daemon.log.dir=${TEZ_DAEMON_LOG_DIR}"
+TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dtez.daemon.log.file=${TEZ_DAEMON_LOG_FILE}"
+TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dtez.daemon.root.logger=${TEZ_DAEMON_LOGGER}"
 
-exec $JAVA -Dproc_tezdaemon -Xmx${TEZ_DAEMON_HEAPSIZE}m ${TEZ_DAEMON_OPTS} -classpath "$CLASSPATH" $CLASS "$@"
-
-
+$JAVA -Dproc_tezdaemon -Xms${TEZ_DAEMON_HEAPSIZE}m -Xmx${TEZ_DAEMON_HEAPSIZE}m ${TEZ_DAEMON_OPTS} -classpath "$CLASSPATH" $CLASS "$@"
 
 

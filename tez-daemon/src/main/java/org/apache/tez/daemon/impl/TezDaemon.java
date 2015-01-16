@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.log4j.Logger;
 import org.apache.tez.daemon.ContainerRunner;
@@ -74,7 +75,7 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
 
     this.server = new TezDaemonProtocolServerImpl(daemonConf, this, address);
     this.containerRunner = new ContainerRunnerImpl(numExecutors, localDirs, shufflePort, address,
-        System.getenv("user.name"), memoryAvailableBytes);
+        System.getProperty("user.name"), memoryAvailableBytes);
   }
 
   @Override

@@ -27,6 +27,7 @@ import java.nio.ByteBuffer;
 import java.security.PrivilegedExceptionAction;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -622,9 +623,14 @@ public class TezClientUtils {
     }
 
     // Setup ContainerLaunchContext for AM container
+    Map<String, ByteBuffer> serviceData = new HashMap<String, ByteBuffer>();
+    serviceData.put(TezConstants.TEZ_SHUFFLE_HANDLER_SERVICE_ID,
+        serializeServiceData(TokenCache.getSessionToken(amLaunchCredentials)));
+
+    // Setup ContainerLaunchContext for AM container
     ContainerLaunchContext amContainer =
         ContainerLaunchContext.newInstance(amLocalResources, environment,
-            vargsFinal, null, securityTokens, acls);
+            vargsFinal, serviceData, securityTokens, acls);
 
     // Set up the ApplicationSubmissionContext
     ApplicationSubmissionContext appContext = Records
@@ -979,5 +985,13 @@ public class TezClientUtils {
     } else {
       return null;
     }
+  }
+
+  private static ByteBuffer serializeServiceData(Token<JobTokenIdentifier> jobToken)
+      throws IOException {
+    // TODO these bytes should be versioned
+    DataOutputBuffer jobToken_dob = new DataOutputBuffer();
+    jobToken.write(jobToken_dob);
+    return ByteBuffer.wrap(jobToken_dob.getData(), 0, jobToken_dob.getLength());
   }
 }

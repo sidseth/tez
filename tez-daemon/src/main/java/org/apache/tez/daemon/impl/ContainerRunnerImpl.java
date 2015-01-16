@@ -90,7 +90,8 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     this.memoryPerExecutor = (long)(totalMemoryAvailableBytes * 0.8 / (float) numExecutors);
 
     LOG.info("ContainerRunnerImpl config: " +
-        "memoryPerExecutorDerviced=" + memoryPerExecutor
+        "memoryPerExecutorDerviced=" + memoryPerExecutor +
+        ", processUser=" + processUser
     );
   }
 

@@ -27,6 +27,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.base.Preconditions;
+import com.google.common.base.Stopwatch;
 import com.google.common.util.concurrent.FutureCallback;
 import com.google.common.util.concurrent.Futures;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -199,13 +200,17 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
 
     @Override
     public ContainerExecutionResult call() throws Exception {
+      Stopwatch sw = new Stopwatch().start();
       tezChild =
           new TezChild(conf, request.getAmHost(), request.getAmPort(),
               request.getContainerIdString(),
               request.getTokenIdentifier(), request.getAppAttemptNumber(), workingDir, localDirs,
               envMap, objectRegistry, pid,
               executionContext, credentials, memoryAvailable);
-      return tezChild.run();
+      ContainerExecutionResult result = tezChild.run();
+      LOG.info("ExecutionTime for Container: " + request.getContainerIdString() + "=" +
+          sw.stop().elapsedMillis());
+      return result;
     }
 
     public TezChild getTezChild() {

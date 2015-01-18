@@ -94,6 +94,7 @@ public class TezChild {
   private final long sendCounterInterval;
   private final int maxEventsToGet;
   private final boolean isLocal;
+  private final boolean isDaemon;
   private final String workingDir;
 
   private final ListeningExecutorService executor;
@@ -161,6 +162,8 @@ public class TezChild {
 
     this.isLocal = defaultConf.getBoolean(TezConfiguration.TEZ_LOCAL_MODE,
         TezConfiguration.TEZ_LOCAL_MODE_DEFAULT);
+    this.isDaemon = defaultConf
+        .getBoolean(TezConfiguration.TEZ_DAEMON_MODE, TezConfiguration.TEZ_DAEMON_MODE_DEFAULT);
     UserGroupInformation taskOwner = UserGroupInformation.createRemoteUser(tokenIdentifier);
     Token<JobTokenIdentifier> jobToken = TokenCache.getSessionToken(credentials);
 
@@ -355,6 +358,8 @@ public class TezChild {
       DefaultMetricsSystem.shutdown();
       if (!isLocal) {
         RPC.stopProxy(umbilical);
+      }
+      if (!isLocal && !isDaemon) {
         LogManager.shutdown();
       }
     }

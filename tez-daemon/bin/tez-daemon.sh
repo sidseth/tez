@@ -48,13 +48,19 @@ JAVA_OPTS_BASE="-server -Djava.net.preferIPv4Stack=true -XX:+UseNUMA -XX:+UsePar
 
 # CLASSPATH initially contains $HADOOP_CONF_DIR & $YARN_CONF_DIR
 if [ ! -d "$HADOOP_CONF_DIR" ]; then
-  echo No HADOOP_CONF_DIR set. 
+  echo No HADOOP_CONF_DIR set, or is not a directory. 
   echo Please specify it in the environment.
   exit 1
 fi
 
 if [ ! -d "${TEZ_PREFIX}" ]; then
-  echo No TEZ_PREFIX set. 
+  echo No TEZ_PREFIX set, or is not a directory. 
+  echo Please specify it in the environment.
+  exit 1
+fi
+
+if [ ! -d "${TEZ_PREFIX}" ]; then
+  echo No TEZ_PREFIX set, or is not a directory. 
   echo Please specify it in the environment.
   exit 1
 fi
@@ -64,13 +70,14 @@ if [ ! -n "${TEZ_DAEMON_LOGGER}" ]; then
   TEZ_DAEMON_LOGGER=${LOG_LEVEL_DEFAULT}
 fi
 
-CLASSPATH=${TEZ_PREFIX}/*:${TEZ_PREFIX}/lib/*:`hadoop classpath`:.
+CLASSPATH=${TEZ_PREFIX}/*:${TEZ_PREFIX}/lib/*:`${HADOOP_PREFIX}/bin/hadoop classpath`:.
 
 if [ -n "TEZ_DAEMON_USER_CLASSPATH" ]; then
   CLASSPATH=${CLASSPATH}:${TEZ_DAEMON_USER_CLASSPATH}
 fi
 
-if [ "$TEZ_DAEMON_LOG_DIR" = "" ]; then
+if [ ! -n "${TEZ_DAEMON_LOG_DIR}" ]; then
+  echo "TEZ_DAEMON_LOG_DIR not defined. Using default"
   TEZ_DAEMON_LOG_DIR="/tmp"
 fi
 

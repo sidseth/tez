@@ -58,3 +58,5 @@ Execute tez-daemon/bin/tez-daemon.sh run
 
 ### Getting a job to execute within the daemon instead of in separate containers
 Setup 'tez.daemon.mode=true' either in tez-site.xml, via a system property for tez-examples, or as part of the configuration when creating an instance of TezClient
+
+Also, set 'tez.am.dag.scheduler.class' to 'org.apache.tez.dag.app.dag.impl.DAGSchedulerNaturalOrderControlled' to prevent potential deadlocks.

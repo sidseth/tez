@@ -8,7 +8,7 @@
 
   <property>
     <name>tez.daemon.yarn.shuffle.port</name>
-    <value>13562</value>
+    <value>15551</value>
     <description>Set to the value on which the ShuffleHandler is running in YARN</description>
   </property>
 

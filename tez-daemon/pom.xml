@@ -51,6 +51,11 @@
       <groupId>org.apache.tez</groupId>
       <artifactId>tez-runtime-internals</artifactId>
     </dependency>
+    <dependency>
+      <!-- Required for the ShuffleHandler -->
+      <groupId>org.apache.tez</groupId>
+      <artifactId>tez-runtime-library</artifactId>
+    </dependency>
   </dependencies>
 
   <build>

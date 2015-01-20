@@ -27,6 +27,7 @@ import org.apache.log4j.Logger;
 import org.apache.tez.daemon.ContainerRunner;
 import org.apache.tez.daemon.TezDaemonConfiguration;
 import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequestProto;
+import org.apache.tez.shufflehandler.ShuffleHandler;
 
 public class TezDaemon extends AbstractService implements ContainerRunner {
 
@@ -44,6 +45,8 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
 
   public TezDaemon(TezDaemonConfiguration daemonConf) {
     super("TezDaemon");
+    // TODO This needs to read TezConfiguration to pick up things like the heartbeat interval from config.
+    // Ideally, this would be part of tez-daemon-configuration
     this.numExecutors = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS,
         TezDaemonConfiguration.TEZ_DAEMON_NUM_EXECUTORS_DEFAULT);
     this.rpcPort = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT,
@@ -97,8 +100,14 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
   }
 
 
-  public static void main(String[] args) throws IOException {
+  public static void main(String[] args) throws Exception {
     TezDaemonConfiguration daemonConf = new TezDaemonConfiguration();
+
+    Configuration shuffleHandlerConf = new Configuration(daemonConf);
+    shuffleHandlerConf.set(ShuffleHandler.SHUFFLE_HANDLER_LOCAL_DIRS,
+        daemonConf.get(TezDaemonConfiguration.TEZ_DAEMON_WORK_DIRS));
+    ShuffleHandler.initializeAndStart(shuffleHandlerConf);
+
     TezDaemon tezDaemon = new TezDaemon(daemonConf);
     // TODO Get the PID - FWIW
 

@@ -39,10 +39,13 @@ import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.DataInputBuffer;
 import org.apache.hadoop.security.Credentials;
+import org.apache.hadoop.security.token.Token;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.hadoop.yarn.api.ApplicationConstants;
 import org.apache.hadoop.yarn.util.AuxiliaryServiceHelper;
 import org.apache.log4j.Logger;
+import org.apache.tez.common.security.JobTokenIdentifier;
+import org.apache.tez.common.security.TokenCache;
 import org.apache.tez.daemon.ContainerRunner;
 import org.apache.tez.daemon.rpc.TezDaemonProtocolProtos.RunContainerRequestProto;
 import org.apache.tez.dag.api.TezConstants;
@@ -51,6 +54,7 @@ import org.apache.tez.runtime.api.impl.ExecutionContextImpl;
 import org.apache.tez.runtime.common.objectregistry.ObjectRegistryImpl;
 import org.apache.tez.runtime.task.TezChild;
 import org.apache.tez.runtime.task.TezChild.ContainerExecutionResult;
+import org.apache.tez.shufflehandler.ShuffleHandler;
 
 public class ContainerRunnerImpl extends AbstractService implements ContainerRunner {
 
@@ -157,6 +161,13 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     byte[] tokenBytes = request.getCredentialsBinary().toByteArray();
     dib.reset(tokenBytes, tokenBytes.length);
     credentials.readTokenStorageStream(dib);
+
+    Token<JobTokenIdentifier> jobToken = TokenCache.getSessionToken(credentials);
+
+    // TODO Unregistering does not happen at the moment, since there's no signals on when an app completes.
+    LOG.info("DEBUG: Registering request with the ShuffleHandler");
+    ShuffleHandler.get().registerApplication(request.getApplicationIdString(), jobToken, request.getUser());
+
 
     ContainerRunnerCallable callable = new ContainerRunnerCallable(request, new Configuration(getConfig()),
         new ExecutionContextImpl(localAddress.get().getHostName()), env, localDirs,

@@ -58,6 +58,12 @@ public class SecureShuffleUtils {
     return JobTokenSecretManager.computeHash(msg, key);
   }
 
+
+  private static boolean verifyHash(byte[] hash, byte[] msg, SecretKey key) {
+    byte[] msg_hash = generateByteHash(msg, key);
+    return WritableComparator.compareBytes(msg_hash, 0, msg_hash.length, hash, 0, hash.length) == 0;
+  }
+
   /**
    * verify that hash equals to HMacHash(msg)
    * @param hash
@@ -81,7 +87,16 @@ public class SecureShuffleUtils {
       throws IOException {
     return new String(Base64.encodeBase64(mgr.computeHash(enc_str.getBytes(Charsets.UTF_8))), Charsets.UTF_8);
   }
-  
+
+  public static void verifyReply(String base64Hash, String msg, SecretKey key) throws IOException {
+    byte[] hash = Base64.decodeBase64(base64Hash.getBytes(Charsets.UTF_8));
+    boolean res = verifyHash(hash, msg.getBytes(Charsets.UTF_8), key);
+
+    if(res != true) {
+      throw new IOException("Verification of the hashReply failed");
+    }
+  }
+
   /**
    * verify that base64Hash is same as HMacHash(msg)
    * @param base64Hash (Base64 encoded hash)

@@ -15,45 +15,55 @@
 Usage Instructions
 ==================
 
+### Setup Configuration
+
+   - Create a directory - <CONFDIR> to place configuration files in
+
+   - Place tez-daemon-env.sh, tez-daemon-site.xml and tez-daemon-log4j.properties into this directory. Sample files are available under src/test/resources
+
+   - Modify tez-daemon-env.sh to setup at least the following
+
+      - TEZ_DAEMON_HOME - the path to the tez jars
+
+      - TEZ_DAEMON_BIN_HOME - the path to the directory containing the tez-daemon scripts (${TEZ_DAEMON_BIN_HOME}/bin/<scripts>)
+
+      - TEZ_DAEMON_HEAPSIZE - size of the JVM heap in MB
+
+   - Optionally setup LOG_DIRS, LOG_LEVEL, PID_DIRS etc
+
+      - TEZ_DAEMON_LOG_DIR=<PathToLogDir>
+
+      - TEZ_DAEMON_LOGGER="INFO,RFA"
+
+      - TEZ_DAEMON_PID_DIR=<PathToPidDir> | Used to start / stop the service
+
+      - TEZ_DAEMON_USER_CLASSPATH - additional classpath to include while starting the daemon
+
+
 ###  Setup the following in the environment before start the TezDaemon process
 
-   -  Heapsize for the running daemon
+   - Configuration directory for the tez daemon
 
-    export TEZ_DAEMON_HEAPSIZE=5000
+    export TEZ_DAEMON_CONF_DIR=<CONFDIR> | created earlier
 
-   - Logging properties
-
-    export TEZ_DAEMON_LOGGER="INFO,RFA"
-
-    export TEZ_DAEMON_LOG_DIR=<PathToLogDir>
-    
    - Other required properties
 
     HADOOP_CONF_DIR - directory for hadoop configuration files
 
     HADOOP_PREFIX - directory where the hadoop binaries are setup
 
-    TEZ_PREFIX - directory where the tez binaries are present
-    
-   - Optional properties
 
-    TEZ_DAEMON_USER_CLASSPATH - additional classpath to include while starting the daemon (not tested)
-    
 ### Setup tez-daemon-site.xml
 An example is included under tez-daemon/src/test/resources. This includes descriptions for fields which need to be changed.
-
-The file should be placed in the classpath of the running daemon (Either HADOOP_CONF_DIR or the tez binary dir)
 
 Other properties can be found in TezDaemonConfiguration.java
 
 ### Setup tez-daemon-log4j.properties
 An example is include under tez-daemon/src/test/resources.
 
-The file should be placed in the classpath of the running daemon (Either HADOOP_CONF_DIR or the tez binary dir)
-
 
 ### Running the tez-daemon
-Execute tez-daemon/bin/tez-daemon.sh run
+Execute tez-daemon/bin/tez-daemon.sh start
 
 
 ### Getting a job to execute within the daemon instead of in separate containers

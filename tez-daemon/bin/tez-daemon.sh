@@ -16,94 +16,137 @@
 # limitations under the License.
 
 
+# Runs a yarn command as a daemon.
+#
 # Environment Variables
-#   TEZ_DAEMON_USER_CLASSPATH
-#   TEZ_DAEMON_HEAPSIZE - MB
-#   TEZ_DAEMON_OPTS - additional options
-#   TEZ_DAEMON_LOGGER - default is INFO,console
+#
+#   TEZ_DAEMON_HOME - Directory with jars (untar tez)
+#   TEZ_DAEMON_BIN_HOME - Directory with binaries
+#   TEZ_DAEMON_CONF_DIR Conf dir for tez-daemon-site.xml
 #   TEZ_DAEMON_LOG_DIR - defaults to /tmp
-#   TEZ_DAEMON_LOG_FILE - 
+#   TEZ_DAEMON_PID_DIR   The pid files are stored. /tmp by default.
+#   TEZ_DAEMON_NICENESS The scheduling priority for daemons. Defaults to 0.
+##
 
-function print_usage() {
-  echo "Usage: tez-daemon.sh [COMMAND]"
-  echo "Commands: "
-  echo "  classpath             print classpath"
-  echo "  run                   run the daemon"
-}
+#set -x
+
+usage="Usage: tez-daemon.sh  (start|stop) "
 
 # if no args specified, show usage
-if [ $# = 0 ]; then
-  print_usage
+if [ $# -le 0 ]; then
+  echo $usage
   exit 1
 fi
 
 # get arguments
-COMMAND=$1
+startStop=$1
 shift
 
 
-JAVA=$JAVA_HOME/bin/java
-LOG_LEVEL_DEFAULT="INFO,console"
-JAVA_OPTS_BASE="-server -Djava.net.preferIPv4Stack=true -XX:+UseNUMA -XX:+UseParallelGC -XX:+PrintGCDetails -verbose:gc -XX:+PrintGCTimeStamps"
+rotate_log ()
+{
+    log=$1;
+    num=5;
+    if [ -n "$2" ]; then
+	num=$2
+    fi
+    if [ -f "$log" ]; then # rotate logs
+	while [ $num -gt 1 ]; do
+	    prev=`expr $num - 1`
+	    [ -f "$log.$prev" ] && mv "$log.$prev" "$log.$num"
+	    num=$prev
+	done
+	mv "$log" "$log.$num";
+    fi
+}
 
-# CLASSPATH initially contains $HADOOP_CONF_DIR & $YARN_CONF_DIR
-if [ ! -d "$HADOOP_CONF_DIR" ]; then
-  echo No HADOOP_CONF_DIR set, or is not a directory. 
-  echo Please specify it in the environment.
+if [ "${TEZ_DAEMON_CONF_DIR}" = "" ] ; then
+  echo "TEZ_DAEMON_CONF_DIR must be specified"
   exit 1
 fi
 
-if [ ! -d "${TEZ_PREFIX}" ]; then
-  echo No TEZ_PREFIX set, or is not a directory. 
-  echo Please specify it in the environment.
-  exit 1
+if [ -f "${TEZ_DAEMON_CONF_DIR}/tez-daemon-env.sh" ] ; then
+  . "${TEZ_DAEMON_CONF_DIR}/tez-daemon-env.sh"
 fi
 
-if [ ! -d "${TEZ_PREFIX}" ]; then
-  echo No TEZ_PREFIX set, or is not a directory. 
-  echo Please specify it in the environment.
-  exit 1
+# get log directory
+if [ "$TEZ_DAEMON_LOG_DIR" = "" ]; then
+  export TEZ_DAEMON_LOG_DIR="/tmp/tezDaemonLogs"
 fi
 
+if [ ! -w "$TEZ_DAEMON_LOG_DIR" ] ; then
+  mkdir -p "$TEZ_DAEMON_LOG_DIR"
+  chown $USER $TEZ_DAEMON_LOG_DIR
+fi
+
+if [ "$TEZ_DAEMON_PID_DIR" = "" ]; then
+  TEZ_DAEMON_PID_DIR=/tmp
+fi
+
+# some variables
+TEZ_DAEMON_LOG_BASE=tez-daemon-$USER-$HOSTNAME
+export TEZ_DAEMON_LOG_FILE=$TEZ_DAEMON_LOG_BASE.log
 if [ ! -n "${TEZ_DAEMON_LOGGER}" ]; then
   echo "TEZ_DAEMON_LOGGER not defined... using defaults"
   TEZ_DAEMON_LOGGER=${LOG_LEVEL_DEFAULT}
 fi
+logLog=$TEZ_DAEMON_LOG_DIR/$TEZ_DAEMON_LOG_BASE.log
+logOut=$TEZ_DAEMON_LOG_DIR/$TEZ_DAEMON_LOG_BASE.out
+pid=$TEZ_DAEMON_PID_DIR/tez-daemon-$USER.pid 
+#KKK
+TEZ_DAEMON_STOP_TIMEOUT=${TEZ_DAEMON_STOP_TIMEOUT:-2}
 
-CLASSPATH=${TEZ_PREFIX}/*:${TEZ_PREFIX}/lib/*:`${HADOOP_PREFIX}/bin/hadoop classpath`:.
-
-if [ -n "TEZ_DAEMON_USER_CLASSPATH" ]; then
-  CLASSPATH=${CLASSPATH}:${TEZ_DAEMON_USER_CLASSPATH}
+# Set default scheduling priority
+if [ "$TEZ_DAEMON_NICENESS" = "" ]; then
+    export TEZ_DAEMON_NICENESS=0
 fi
 
-if [ ! -n "${TEZ_DAEMON_LOG_DIR}" ]; then
-  echo "TEZ_DAEMON_LOG_DIR not defined. Using default"
-  TEZ_DAEMON_LOG_DIR="/tmp"
-fi
+case $startStop in
 
-if [ "$TEZ_DAEMON_LOGFILE" = "" ]; then
-  TEZ_DAEMON_LOG_FILE='tezdaemon.log'
-fi
+  (start)
 
-if [ "$TEZ_DAEMON_HEAPSIZE" = "" ]; then
-  TEZ_DAEMON_HEAPSIZE=4096
-fi
+    [ -w "$TEZ_DAEMON_PID_DIR" ] || mkdir -p "$TEZ_DAEMON_PID_DIR"
 
-# Figure out classes based on the command
+    if [ -f $pid ]; then
+      if kill -0 `cat $pid` > /dev/null 2>&1; then
+        echo tezdaemon running as process `cat $pid`.  Stop it first.
+        exit 1
+      fi
+    fi
 
-if [ "$COMMAND" = "classpath" ] ; then
-  echo $CLASSPATH
-  exit
-elif [ "$COMMAND" = "run" ] ; then
-  CLASS='org.apache.tez.daemon.impl.TezDaemon'
-fi
+    #rotate_log $logLog
+    #rotate_log $logOut
+    echo starting tezdaemon, logging to $logLog and $logOut
+    nohup nice -n $TEZ_DAEMON_NICENESS "$TEZ_DAEMON_BIN_HOME"/bin/runTezDaemon.sh run  > "$logOut" 2>&1 < /dev/null &
+    echo $! > $pid
+    ;;
+          
+  (stop)
 
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} ${JAVA_OPTS_BASE}"
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dlog4j.configuration=tez-daemon-log4j.properties"
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dtez.daemon.log.dir=${TEZ_DAEMON_LOG_DIR}"
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dtez.daemon.log.file=${TEZ_DAEMON_LOG_FILE}"
-TEZ_DAEMON_OPTS="${TEZ_DAEMON_OPTS} -Dtez.daemon.root.logger=${TEZ_DAEMON_LOGGER}"
+    if [ -f $pid ]; then
+      TARGET_PID=`cat $pid`
+      if kill -0 $TARGET_PID > /dev/null 2>&1; then
+        echo stopping tezDaemon
+        kill $TARGET_PID
+        sleep $TEZ_DAEMON_STOP_TIMEOUT
+        if kill -0 $TARGET_PID > /dev/null 2>&1; then
+          echo "tezDaemon did not stop gracefully after $TEZ_DAEMON_STOP_TIMEOUT seconds: killing with kill -9"
+          kill -9 $TARGET_PID
+        fi
+      else
+        echo no tezDaemon to stop
+      fi
+      rm -f $pid
+    else
+      echo no tezDaemon to stop
+    fi
+    ;;
 
-$JAVA -Dproc_tezdaemon -Xms${TEZ_DAEMON_HEAPSIZE}m -Xmx${TEZ_DAEMON_HEAPSIZE}m ${TEZ_DAEMON_OPTS} -classpath "$CLASSPATH" $CLASS "$@"
+  (*)
+    echo $usage
+    exit 1
+    ;;
+
+esac
 
 

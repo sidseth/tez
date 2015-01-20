@@ -7,6 +7,8 @@ Release 0.7.0: Unreleased
 INCOMPATIBLE CHANGES
 
 ALL CHANGES:
+  TEZ-1855. Avoid scanning for previously written files within Inputs / Outputs.
+  TEZ-1902. Fix findbugs warnings in tez-mapreduce.
   TEZ-1963. Fix post memory merge to be > 2 GB.
   TEZ-1901. Fix findbugs warnings in tez-examples.
   TEZ-1941. Memory provided by *Context.getAvailableMemory needs to be setup explicitly.
@@ -45,6 +47,8 @@ Release 0.6.0: Unreleased
 INCOMPATIBLE CHANGES
 
 ALL CHANGES:
+  TEZ-1977. Fixup CHANGES.txt with Tez UI jiras
+  TEZ-1743. Add versions-maven-plugins artifacts to gitignore
   TEZ-1968. Tez UI - All vertices of DAG are not listed in vertices page
   TEZ-1890. tez-ui web.tar.gz also being uploaded to maven repository
   TEZ-1938. Build warning duplicate jersey-json definitions
@@ -112,6 +116,20 @@ ALL CHANGES:
   TEZ-1790. DeallocationTaskRequest may been handled before corresponding AllocationTaskRequest in local mode
 
 TEZ-UI CHANGES (TEZ-8):
+  TEZ-1823. default ATS url should be the same host as ui
+  TEZ-1817. Add configuration and build details to README
+  TEZ-1813. display loading and other error messages in tez-ui
+  TEZ-1809. Provide a error bar to report errors to users in Tez-UI
+  TEZ-1810. Do not deploy tez-ui war to maven repo
+  TEZ-1709. Bunch of files in tez-ui missing Apache license header
+  TEZ-1784. Attempt details in tasks table.
+  TEZ-1801. Update build instructions for tez-ui
+  TEZ-1757. Column selector for tables.
+  TEZ-1794. Vertex view needs a task attempt rollup
+  TEZ-1791. breadcrumbs for moving between pages.
+  TEZ-1781. Configurations view ~ New design
+  TEZ-1605. Landing page for Tez UI
+  TEZ-1600. Swimlanes View for Tez UI 
   TEZ-1799. Enable Cross Origin Support in Tez UI
   TEZ-1634. Fix compressed IFile shuffle errors
   TEZ-1615. Skeleton framework for Tez UI

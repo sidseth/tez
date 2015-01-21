@@ -19,7 +19,7 @@ Usage Instructions
 
    - Create a directory - <CONFDIR> to place configuration files in
 
-   - Place tez-daemon-env.sh, tez-daemon-site.xml and tez-daemon-log4j.properties into this directory. Sample files are available under src/test/resources
+   - Place tez-daemon-env.sh, tez-daemon-site.xml and tez-daemon-log4j.properties into this directory. Sample files are available under tez-daemon/src/test/resources or tez-daemon/bin
 
    - Modify tez-daemon-env.sh to setup at least the following
 

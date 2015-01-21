@@ -66,13 +66,12 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
   private final String[] localDirsBase;
   private final int localShufflePort;
   private final Map<String, String> localEnv = new HashMap<String, String>();
-  private final String processUser;
   private volatile FileSystem localFs;
   private final long memoryPerExecutor;
   // TODO Support for removing queued containers, interrupting / killing specific containers
 
   public ContainerRunnerImpl(int numExecutors, String[] localDirsBase, int localShufflePort,
-                             AtomicReference<InetSocketAddress> localAddress, String processUser,
+                             AtomicReference<InetSocketAddress> localAddress,
                              long totalMemoryAvailableBytes) {
     super("ContainerRunnerImpl");
     Preconditions.checkState(numExecutors > 0,
@@ -81,7 +80,6 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     this.localDirsBase = localDirsBase;
     this.localShufflePort = localShufflePort;
     this.localAddress = localAddress;
-    this.processUser = processUser;
 
     ExecutorService raw = Executors.newFixedThreadPool(numExecutors,
         new ThreadFactoryBuilder().setNameFormat("ContainerExecutor %d").build());
@@ -95,8 +93,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     this.memoryPerExecutor = (long)(totalMemoryAvailableBytes * 0.8 / (float) numExecutors);
 
     LOG.info("ContainerRunnerImpl config: " +
-        "memoryPerExecutorDerviced=" + memoryPerExecutor +
-        ", processUser=" + processUser
+        "memoryPerExecutorDerviced=" + memoryPerExecutor
     );
   }
 
@@ -144,7 +141,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
     // Setup up local dirs to be application specific, and create them.
     for (int i = 0; i < localDirsBase.length; i++) {
       localDirs[i] = createAppSpecificLocalDir(localDirsBase[i], request.getApplicationIdString(),
-          processUser);
+          request.getUser());
       localFs.mkdirs(new Path(localDirs[i]));
     }
     LOG.info("DEBUG: Dirs are: " + Arrays.toString(localDirs));
@@ -217,7 +214,7 @@ public class ContainerRunnerImpl extends AbstractService implements ContainerRun
               request.getContainerIdString(),
               request.getTokenIdentifier(), request.getAppAttemptNumber(), workingDir, localDirs,
               envMap, objectRegistry, pid,
-              executionContext, credentials, memoryAvailable);
+              executionContext, credentials, memoryAvailable, request.getUser());
       ContainerExecutionResult result = tezChild.run();
       LOG.info("ExecutionTime for Container: " + request.getContainerIdString() + "=" +
           sw.stop().elapsedMillis());

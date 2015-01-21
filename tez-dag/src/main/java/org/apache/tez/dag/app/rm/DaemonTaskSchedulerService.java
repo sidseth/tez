@@ -106,7 +106,7 @@ public class DaemonTaskSchedulerService extends TaskSchedulerService {
     this.resourcePerExecutor = Resource.newInstance(memoryPerExecutor, coresPerExecutor);
     this.amRmClient = TezAMRMClientAsync.createAMRMClientAsync(5000, new FakeAmRmCallbackHandler());
 
-    String[] hosts = conf.getStrings(TezDaemonConfiguration.TEZ_DAEMON_AM_SERVICE_HOSTS);
+    String[] hosts = conf.getTrimmedStrings(TezDaemonConfiguration.TEZ_DAEMON_AM_SERVICE_HOSTS);
     if (hosts == null || hosts.length == 0) {
       hosts = new String[]{"localhost"};
     }

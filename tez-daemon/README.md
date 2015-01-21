@@ -39,6 +39,10 @@ Usage Instructions
 
       - TEZ_DAEMON_USER_CLASSPATH - additional classpath to include while starting the daemon
 
+   - Changes to tez-site.xml
+
+      All configuration parameters set in tez-daemon-site.xml which contain ".am." in their name should also be placed in tez-site.xml (temporary - while this is resolved)
+
 
 ###  Setup the following in the environment before start the TezDaemon process
 

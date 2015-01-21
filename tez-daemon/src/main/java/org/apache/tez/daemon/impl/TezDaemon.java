@@ -21,7 +21,6 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import com.google.common.base.Preconditions;
 import org.apache.hadoop.conf.Configuration;
-import org.apache.hadoop.security.UserGroupInformation;
 import org.apache.hadoop.service.AbstractService;
 import org.apache.log4j.Logger;
 import org.apache.tez.daemon.ContainerRunner;
@@ -52,7 +51,7 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
     this.rpcPort = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT,
         TezDaemonConfiguration.TEZ_DAEMON_RPC_PORT_DEFAULT);
     this.daemonConf = daemonConf;
-    this.localDirs = daemonConf.getStrings(TezDaemonConfiguration.TEZ_DAEMON_WORK_DIRS);
+    this.localDirs = daemonConf.getTrimmedStrings(TezDaemonConfiguration.TEZ_DAEMON_WORK_DIRS);
     this.shufflePort = daemonConf.getInt(TezDaemonConfiguration.TEZ_DAEMON_YARN_SHUFFLE_PORT, -1);
 
     long memoryAvailableBytes = this.daemonConf
@@ -78,7 +77,7 @@ public class TezDaemon extends AbstractService implements ContainerRunner {
 
     this.server = new TezDaemonProtocolServerImpl(daemonConf, this, address);
     this.containerRunner = new ContainerRunnerImpl(numExecutors, localDirs, shufflePort, address,
-        System.getProperty("user.name"), memoryAvailableBytes);
+        memoryAvailableBytes);
   }
 
   @Override

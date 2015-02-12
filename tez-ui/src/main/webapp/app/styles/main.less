@@ -16,28 +16,14 @@
  * limitations under the License.
  */
 
-
-// Colors
-@logo-orange: #D27A22;
-@bg-lite: #f5f5f5;
-@border-lite: #e5e5e5;
-@bg-red-light: #FFE6E6;
-
-@white: #fff;
-
-@text-color: #666666;
-@text-red: red;
-
-@top-nav-bg-color-from: #d5d5d5;
-@top-nav-bg-color-to: #f0f0f0;
-
-@success-color: limegreen;
-@error-color: crimson;
-@warning-color: orange;
-
 // Imports
 @import "../bower_components/font-awesome/less/font-awesome";
 @import "../bower_components/bootstrap/less/bootstrap"; //UI theme
+@import "app/styles/dag-view";
+
+// Colors
+@import "app/styles/colors";
+@import "app/styles/shared";
 
 // Base style
 body, html, body > .ember-view {
@@ -205,11 +191,6 @@ body, html, body > .ember-view {
   }
 }
 
-.fa-icon(@name) {
-    @content: "fa-var-@{name}";
-    &:before {content: @@content}
-}
-
 /* misc helpers */
 .inline-block {
   display: inline-block;
@@ -263,25 +244,44 @@ body, html, body > .ember-view {
 
 /* Navigation */
 .page-nav-link {
-  .fa;
-  .fa-2x;
-  cursor: pointer;
-  color: black;
+  padding-top: 2px;
 
-  &.disabled {
+  .page-count {
+    display: inline-block;
+    text-align: right;
+    width: 100px;
+    .text {
+      display: inline-block;
+      width: 30px;
+      margin-right: 3px;
+      font-size: .8em;
+    }
+    .counter {
+      font-size: 2em;
+    }
+  }
+
+  .nav-first, .nav-prev, .nav-next {
+    .fa;
+    .fa-2x;
+    cursor: pointer;
+    color: black;
+  }
+
+  .disabled {
     pointer-events: none;
     color:lightgray;
   }
 
-  &.nav-first {
+  .nav-first {
     .fa-icon(arrow-circle-o-left);
   }
 
-  &.nav-prev {
+  .nav-prev {
     .fa-icon(arrow-circle-left)
   }
 
-  &.nav-next {
+  .nav-next {
     .fa-icon(arrow-circle-right);
   }
 }
@@ -401,7 +401,7 @@ div.indent {
     border: 1px solid #dcdcdc;
     padding: 5px 5px;
     width: 50%;
-    overflow: scroll;
+    word-wrap:break-word;
   }
 
   th, td.filter {
@@ -412,6 +412,18 @@ div.indent {
 
   input[type=search] {
     width: 100%;
+  }
+}
+
+.ember-table-header-row {
+  .ember-table-content {
+    padding: 2px;
+    input, select {
+      width: 100%;
+    }
+    input {
+      margin-bottom: -3px;
+    }
   }
 }
 

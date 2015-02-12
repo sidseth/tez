@@ -17,20 +17,13 @@
 }}
 
 {{#unless loading}}
-  {{#if inputsAvailable}}
-    <div class='margin-small align-children-right'>
-      {{page-nav-component
-        hasPrev=hasPrev
-        hasNext=hasNext
-        navNext='navigateNext'
-        navPrev='navigatePrev'
-        navFirst='navigateFirst'
-      }}
-    </div>
-    {{partial 'partials/table'}}
-  {{else}}
-    <h1>Inputs are not available!</h1>
-  {{/if}}
+  {{dag-view-component
+    data=viewData
+    vertexProperties=columns
+    entityClicked='entityClicked'
+    configure='selectColumns'
+  }}
+  <div class="dag-view-legend">Double click source/sink bubble to toggle visibility locally.</div>
 {{else}}
-  {{partial 'utils/loading-spinner'}}
+  {{partial 'partials/loading-spinner'}}
 {{/unless}}

@@ -20,6 +20,7 @@
 Releases
 ------------
 
+-   [Apache Tez 0.6.0](./apache-tez-0-6-0.html) (Jan 23, 2015)
 -   [Apache Tez 0.5.3](./apache-tez-0-5-3.html) (Dec 10, 2014)
 -   [Apache Tez 0.5.2](./apache-tez-0-5-2.html) (Nov 07, 2014)
 -   [Apache Tez 0.5.1](./apache-tez-0-5-1.html) (Oct 08, 2014)

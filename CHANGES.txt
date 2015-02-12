@@ -7,6 +7,13 @@ Release 0.7.0: Unreleased
 INCOMPATIBLE CHANGES
 
 ALL CHANGES:
+  TEZ-2000. Source vertex exists error during DAG submission.
+  TEZ-2008. Add methods to SecureShuffleUtils to verify a reply based on a provided Key.
+  TEZ-1995. Build failure against hadoop 2.2.
+  TEZ-1997. Remove synchronization DefaultSorter::isRLENeeded() (Causes sorter to hang indefinitely in large jobs).
+  TEZ-1996. Update Website after 0.6.0
+  TEZ-1803. Support > 2gb sort buffer in pipelinedsorter.
+  TEZ-1826. Add option to disable split grouping and local mode option for tez-examples.
   TEZ-1982. TezChild setupUgi should not be using environment.
   TEZ-1980. Suppress tez-dag findbugs warnings until addressed.
   TEZ-1855. Avoid scanning for previously written files within Inputs / Outputs.
@@ -16,7 +23,6 @@ ALL CHANGES:
   TEZ-1941. Memory provided by *Context.getAvailableMemory needs to be setup explicitly.
   TEZ-1879. Create local UGI instances for each task and the AM, when running in LocalMode.
   TEZ-1661. LocalTaskScheduler hangs when shutdown.
-  TEZ-1934. TestAMRecovery may fail due to the execution order is not determined.
   TEZ-1951. Fix general findbugs warnings in tez-dag.
   TEZ-1905. Fix findbugs warnings in tez-tests.
   TEZ-1945. Remove 2 GB memlimit restriction in MergeManager.
@@ -49,6 +55,14 @@ Release 0.6.1: Unreleased
 INCOMPATIBLE CHANGES
 
 ALL CHANGES:
+  TEZ-2017. TEZ UI - Dag view throwing error whild re-displaying additionals in some dags.
+  TEZ-2013. TEZ UI - App Details Page UI Nits
+  TEZ-2014. Tez UI: Nits : All tables, Vertices Page UI.
+  TEZ-2012. TEZ UI: Show page number in all tables, and display more readable task/attempt ids.
+  TEZ-1973. Dag View
+  TEZ-2010. History payload generated from conf has ${var} placeholders.
+  TEZ-1946. Tez UI: add source & sink views, add counters to vertices/all task views.
+  TEZ-1987. Tez UI non-standalone mode uses invalid protocol.
   TEZ-1983. Tez UI swimlane task attempt link is broken
 
 Release 0.6.0: Unreleased
@@ -74,7 +88,6 @@ ALL CHANGES:
   TEZ-1864. move initialization code dependent on config params to App.ready.
   TEZ-1870. Time displayed in the UI is in GMT.
   TEZ-1858. Docs for deploying/using the Tez UI.
-  TEZ-1642. TestAMRecovery sometimes fail.
   TEZ-1859. TestGroupedSplits has commented out test: testGzip.
   TEZ-1868. Document how to do Windows builds due to with ACL symlink build changes.
   TEZ-1872. docs/src/site/custom/project-info-report.properties needs license header.
@@ -159,6 +172,8 @@ TEZ-UI CHANGES (TEZ-8):
 Release 0.5.4: Unreleased
 
 ALL CHANGES:
+  TEZ-1934. TestAMRecovery may fail due to the execution order is not determined.
+  TEZ-1642. TestAMRecovery sometimes fail.
   TEZ-1931. Publish tez version info to Timeline.
   TEZ-1942. Number of tasks show in Tez UI with auto-reduce parallelism is misleading.
   TEZ-1962. Fix a thread leak in LocalMode.

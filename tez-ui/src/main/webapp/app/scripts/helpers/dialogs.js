@@ -41,7 +41,7 @@ App.Dialogs = Em.Namespace.create({
       var id = getProperty(item, 'id'),
           displayText = getProperty(item, 'displayText');
 
-      listHTML += '<li><input id=%@ type="checkbox" %@ /> %@</li>'.fmt(
+      listHTML += '<li class="no-wrap"><input id=%@ type="checkbox" %@ /> %@</li>'.fmt(
         id,
         selectedItems[id] ? 'checked' : '',
         displayText
@@ -49,10 +49,9 @@ App.Dialogs = Em.Namespace.create({
     });
 
     container.append('<ol class="selectable"> %@ </ol>'.fmt(listHTML));
-    $('#dialogContainer').append(container);
 
     return new Em.RSVP.Promise(function (resolve, reject) {
-      container.dialog({
+      var dialogOptions = {
         modal: true,
         title: title,
         width: 350,
@@ -78,7 +77,13 @@ App.Dialogs = Em.Namespace.create({
             container.remove();
           }
         }
-      });
+      };
+
+      if($('#dialog-container').length) {
+        dialogOptions.appendTo = '#dialog-container';
+      }
+
+      container.dialog(dialogOptions);
     });
   }
 });

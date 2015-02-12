@@ -16,31 +16,4 @@
 * limitations under the License.
 }}
 
-{{#if needToShowInputDetails}}
-  <div class='align-left margin-small-horizontal' style="margin-bottom:10px;">
-    <table class='detail-list'>
-      <thead>
-        <tr>
-          <th>Input Details</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Name</td>
-          <td>{{inputName}}</td>
-        </tr>
-        <tr>
-          <td>Class</td>
-          <td>{{inputClass}}</td>
-        </tr>
-        <tr>
-          <td>Initializer</td>
-          <td>{{inputInitializer}}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-{{/if}}
-<div class='table-container'>
-  {{kv-table-component data=configs}}
-</div>
+{{partial 'partials/configs'}}

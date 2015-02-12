@@ -74,6 +74,13 @@ App.Helpers.misc = {
     return $.inArray(status, ['RUNNING', 'SUCCEEDED', 'FAILED', 'KILLED']) != -1;
   },
 
+  /**
+   * To trim a complete class path with namespace to the class name.
+   */
+  getClassName: function (classPath) {
+    return classPath.substr(classPath.lastIndexOf('.') + 1);
+  },
+
   /*
    * Normalizes counter style configurations
    * @param counterConfigs Array
@@ -81,8 +88,9 @@ App.Helpers.misc = {
    */
   normalizeCounterConfigs: function (counterConfigs) {
     return counterConfigs.map(function (configuration) {
-      configuration.headerCellName = configuration.headerCellName || configuration.headerText;
-      configuration.id = '%@/%@'.fmt(configuration.groupId, configuration.counterId),
+      configuration.headerCellName = configuration.counterName || configuration.counterId;
+      configuration.id = '%@/%@'.fmt(configuration.counterGroupName || configuration.groupId,
+          configuration.counterName || configuration.counterId),
       configuration.getCellContent = App.Helpers.misc.getCounterCellContent;
       return configuration;
     });
@@ -126,7 +134,7 @@ App.Helpers.misc = {
           get('value');
     }catch(e){}
 
-    return value;
+    return App.Helpers.number.formatNumThousands(value);
   },
 
   /* 
@@ -151,6 +159,20 @@ App.Helpers.misc = {
       msg: msg,
       details: error.stack
     };
+  },
+
+  merge: function objectMerge(obj1, obj2) {
+    $.each(obj2, function (key, val) {
+      if(Array.isArray(obj1[key]) && Array.isArray(val)) {
+        $.merge(obj1[key], val);
+      }
+      else if($.isPlainObject(obj1[key]) && $.isPlainObject(val)) {
+        objectMerge(obj1[key], val);
+      }
+      else {
+        obj1[key] = val;
+      }
+    });
   },
 
   dagStatusUIOptions: [

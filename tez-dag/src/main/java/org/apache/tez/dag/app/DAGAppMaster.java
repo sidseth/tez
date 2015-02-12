@@ -1509,6 +1509,11 @@ public class DAGAppMaster extends AbstractService {
     }
 
     @Override
+    public Credentials getAppCredentials() {
+      return amCredentials;
+    }
+
+    @Override
     public Map<ApplicationAccessType, String> getApplicationACLs() {
       if (getServiceState() != STATE.STARTED) {
         throw new TezUncheckedException(

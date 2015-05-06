@@ -20,10 +20,14 @@ package org.apache.tez.runtime;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.management.ManagementFactory;
+import java.lang.management.ThreadInfo;
+import java.lang.management.ThreadMXBean;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +41,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import com.google.common.base.Throwables;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.tez.runtime.api.TaskContext;
 import org.apache.tez.runtime.api.impl.TezProcessorContextImpl;
@@ -109,6 +114,10 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
   private final List<GroupInputSpec> groupInputSpecs;
   private ConcurrentHashMap<String, MergedLogicalInput> groupInputsMap;
 
+  private final ConcurrentHashMap<String, LogicalInput> initializedInputs;
+  private final ConcurrentHashMap<String, LogicalOutput> initializedOutputs;
+  private boolean processorClosed;
+
   private final ProcessorDescriptor processorDescriptor;
   private AbstractLogicalIOProcessor processor;
   private ProcessorContext processorContext;
@@ -159,6 +168,9 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
 
     this.runInputMap = new LinkedHashMap<String, LogicalInput>();
     this.runOutputMap = new LinkedHashMap<String, LogicalOutput>();
+
+    this.initializedInputs = new ConcurrentHashMap<String, LogicalInput>();
+    this.initializedOutputs = new ConcurrentHashMap<String, LogicalOutput>();
 
     this.processorDescriptor = taskSpec.getProcessorDescriptor();
     this.serviceConsumerMetadata = serviceConsumerMetadata;
@@ -338,11 +350,13 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
       this.state.set(State.CLOSED);
 
       // Close the Processor.
+      processorClosed = true;
       processor.close();
 
       // Close the Inputs.
       for (InputSpec inputSpec : inputSpecs) {
         String srcVertexName = inputSpec.getSourceVertexName();
+        initializedInputs.remove(srcVertexName);
         List<Event> closeInputEvents = ((InputFrameworkInterface)inputsMap.get(srcVertexName)).close();
         sendTaskGeneratedEvents(closeInputEvents,
             EventProducerConsumerType.INPUT, taskSpec.getVertexName(),
@@ -352,6 +366,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
       // Close the Outputs.
       for (OutputSpec outputSpec : outputSpecs) {
         String destVertexName = outputSpec.getDestinationVertexName();
+        initializedOutputs.remove(destVertexName);
         List<Event> closeOutputEvents = ((LogicalOutputFrameworkInterface)outputsMap.get(destVertexName)).close();
         sendTaskGeneratedEvents(closeOutputEvents,
             EventProducerConsumerType.OUTPUT, taskSpec.getVertexName(),
@@ -391,6 +406,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
           inputContext.getTaskVertexName(), inputContext.getSourceVertexName(),
           taskSpec.getTaskAttemptID());
       LOG.info("Initialized Input with src edge: " + edgeName);
+      initializedInputs.put(edgeName, input);
       return null;
     }
   }
@@ -439,6 +455,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
           outputContext.getTaskVertexName(),
           outputContext.getDestinationVertexName(), taskSpec.getTaskAttemptID());
       LOG.info("Initialized Output with dest edge: " + edgeName);
+      initializedOutputs.put(edgeName, output);
       return null;
     }
   }
@@ -664,6 +681,13 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     eventsToBeProcessed.addAll(events);
   }
 
+  @Override
+  public synchronized void abortTask() throws Exception {
+    if (processor != null) {
+      processor.abort();
+    }
+  }
+
   private void startRouterThread() {
     eventRouterThread = new Thread(new RunnableWithNdc() {
       public void runInternal() {
@@ -683,6 +707,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
             if (!isTaskDone()) {
               LOG.warn("Event Router thread interrupted. Returning.");
             }
+            Thread.currentThread().interrupt();
             return;
           }
         }
@@ -692,6 +717,12 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     eventRouterThread.setName("TezTaskEventRouter["
         + taskSpec.getTaskAttemptID().toString() + "]");
     eventRouterThread.start();
+  }
+
+  private void maybeResetInterruptStatus() {
+    if (!Thread.currentThread().isInterrupted()) {
+      Thread.currentThread().interrupt();
+    }
   }
 
   private void cleanupInputOutputs() {
@@ -726,6 +757,103 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
   }
 
   public synchronized void cleanup() {
+
+    /**
+     * Cleanup IPO that are not closed.  In case, regular close() has happened in IPO, they
+     * would not be available in the IPOs to be cleaned. So this is safe.
+     *
+     * e.g whenever input gets closed() in normal way, it automatically removes it from
+     * initializedInputs map.
+     *
+     * In case any exception happens in processor close or IO close, it wouldn't be removed from
+     * the initialized IO data structures and here is the chance to close them and release
+     * resources.
+     *
+     */
+    if (LOG.isDebugEnabled()) {
+      LOG.debug("Processor closed={}", processorClosed);
+      LOG.debug("Num of inputs to be closed={}", initializedInputs.size());
+      LOG.debug("Num of outputs to be closed={}", initializedOutputs.size());
+    }
+    if (!processorClosed) {
+      try {
+        processorClosed = true;
+        processor.close();
+
+        LOG.info("Closed processor for vertex={}, index={}, interruptedStatus={}",
+            processor
+                .getContext().getTaskVertexName(),
+            processor.getContext().getTaskVertexIndex(),
+            Thread.currentThread().isInterrupted());
+
+        maybeResetInterruptStatus();
+      } catch (InterruptedException ie) {
+        //reset the status
+        LOG.info("Resetting interrupt for processor");
+        Thread.currentThread().interrupt();
+      } catch (Throwable e) {
+        LOG.warn("Exception when closing processor", e);
+      }
+    }
+    // Close the remaining inited Inputs.
+    Iterator<String> srcVertexItr = initializedInputs.keySet().iterator();
+    while (srcVertexItr.hasNext()) {
+      String srcVertexName = srcVertexItr.next();
+      try {
+        srcVertexItr.remove();
+
+        ((InputFrameworkInterface) initializedInputs.get(srcVertexName)).close();
+        initializedInputs.remove(srcVertexName);
+
+        maybeResetInterruptStatus();
+      } catch (InterruptedException ie) {
+        //reset the status
+        LOG.info("Resetting interrupt status for input with srcVertexName={}",
+            srcVertexName);
+        Thread.currentThread().interrupt();
+      } catch (Throwable e) {
+        LOG.warn("Exception when closing input in cleanup(interrupted)", e);
+      } finally {
+        LOG.info("Close input for vertex={}, sourceVertex={}, interruptedStatus={}", processor
+            .getContext().getTaskVertexName(), srcVertexName, Thread.currentThread()
+            .isInterrupted());
+      }
+    }
+
+    // Close the remaining inited Outputs.
+    try {
+      Iterator<String> outVertexItr = initializedOutputs.keySet().iterator();
+      while (outVertexItr.hasNext()) {
+        String destVertexName = outVertexItr.next();
+        try {
+          outVertexItr.remove();
+
+          ((OutputFrameworkInterface) initializedOutputs.get(destVertexName)).close();
+          initializedOutputs.remove(destVertexName);
+
+          maybeResetInterruptStatus();
+        } catch (InterruptedException ie) {
+          //reset the status
+          LOG.info("Resetting interrupt status for output with destVertexName={}",
+              destVertexName);
+          Thread.currentThread().interrupt();
+        } catch (Throwable e) {
+          LOG.warn("Exception when closing output in cleanup(interrupted)", e);
+        } finally {
+          LOG.info("Close input for vertex={}, sourceVertex={}, interruptedStatus={}", processor
+              .getContext().getTaskVertexName(), destVertexName, Thread.currentThread()
+              .isInterrupted());
+        }
+      }
+    } catch (Throwable e) {
+      LOG.warn(Throwables.getStackTraceAsString(e));
+    }
+
+    if (LOG.isDebugEnabled()) {
+      printThreads();
+    }
+
+
     try {
       cleanupInputOutputs();
       closeContexts();
@@ -737,6 +865,20 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     setTaskDone();
     if (eventRouterThread != null) {
       eventRouterThread.interrupt();
+    }
+  }
+
+
+  /**
+   * Print all threads in JVM (only for debugging)
+   */
+  void printThreads() {
+    //Print the status of all threads in JVM
+    ThreadMXBean threadMXBean = ManagementFactory.getThreadMXBean();
+    long[] threadIds = threadMXBean.getAllThreadIds();
+    for (Long id : threadIds) {
+      ThreadInfo threadInfo = threadMXBean.getThreadInfo(id);
+      LOG.info("ThreadId : " + id + ", name=" + threadInfo.getThreadName());
     }
   }
   

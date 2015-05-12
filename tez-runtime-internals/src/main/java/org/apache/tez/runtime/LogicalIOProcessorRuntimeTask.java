@@ -119,7 +119,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
   final ConcurrentHashMap<String, LogicalInput> initializedInputs;
   final ConcurrentHashMap<String, LogicalOutput> initializedOutputs;
 
-  private boolean processorClosed;
+  private boolean processorClosed = false;
   final ProcessorDescriptor processorDescriptor;
   AbstractLogicalIOProcessor processor;
   ProcessorContext processorContext;
@@ -693,7 +693,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
   }
 
   @Override
-  public synchronized void abortTask() throws Exception {
+  public synchronized void abortTask() {
     if (processor != null) {
       processor.abort();
     }
@@ -791,7 +791,7 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
       LOG.debug("Num of inputs to be closed={}", initializedInputs.size());
       LOG.debug("Num of outputs to be closed={}", initializedOutputs.size());
     }
-    if (!processorClosed) {
+    if (!processorClosed && processor != null) {
       try {
         processorClosed = true;
         processor.close();
@@ -808,19 +808,20 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
         LOG.info("Resetting interrupt for processor");
         Thread.currentThread().interrupt();
       } catch (Throwable e) {
-        LOG.warn("Exception when closing processor", e);
+        LOG.warn(
+            "Ignoring Exception when closing processor(cleanup). Exception class={}, message={}" +
+                e.getClass().getName(), e.getMessage(), e);
       }
     }
+
     // Close the remaining inited Inputs.
-    Iterator<String> srcVertexItr = initializedInputs.keySet().iterator();
-    while (srcVertexItr.hasNext()) {
-      String srcVertexName = srcVertexItr.next();
+    Iterator<Map.Entry<String, LogicalInput>> inputIterator = initializedInputs.entrySet().iterator();
+    while (inputIterator.hasNext()) {
+      Map.Entry<String, LogicalInput> entry = inputIterator.next();
+      String srcVertexName = entry.getKey();
+      inputIterator.remove();
       try {
-        srcVertexItr.remove();
-
-        initializedInputs.remove(srcVertexName);
-        ((InputFrameworkInterface) initializedInputs.get(srcVertexName)).close();
-
+        ((InputFrameworkInterface)entry.getValue()).close();
         maybeResetInterruptStatus();
       } catch (InterruptedException ie) {
         //reset the status
@@ -828,7 +829,9 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
             srcVertexName);
         Thread.currentThread().interrupt();
       } catch (Throwable e) {
-        LOG.warn("Exception when closing input in cleanup(interrupted)", e);
+        LOG.warn(
+            "Ignoring exception when closing input {}(cleanup). Exception class={}, message={}",
+            srcVertexName, e.getClass().getName(), e.getMessage(), e);
       } finally {
         LOG.info("Close input for vertex={}, sourceVertex={}, interruptedStatus={}", processor
             .getContext().getTaskVertexName(), srcVertexName, Thread.currentThread()
@@ -837,32 +840,28 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
     }
 
     // Close the remaining inited Outputs.
-    try {
-      Iterator<String> outVertexItr = initializedOutputs.keySet().iterator();
-      while (outVertexItr.hasNext()) {
-        String destVertexName = outVertexItr.next();
-        try {
-          outVertexItr.remove();
-
-          initializedOutputs.remove(destVertexName);
-          ((OutputFrameworkInterface) initializedOutputs.get(destVertexName)).close();
-
-          maybeResetInterruptStatus();
-        } catch (InterruptedException ie) {
-          //reset the status
-          LOG.info("Resetting interrupt status for output with destVertexName={}",
-              destVertexName);
-          Thread.currentThread().interrupt();
-        } catch (Throwable e) {
-          LOG.warn("Exception when closing output in cleanup(interrupted)", e);
-        } finally {
-          LOG.info("Close input for vertex={}, sourceVertex={}, interruptedStatus={}", processor
-              .getContext().getTaskVertexName(), destVertexName, Thread.currentThread()
-              .isInterrupted());
-        }
+    Iterator<Map.Entry<String, LogicalOutput>> outputIterator = initializedOutputs.entrySet().iterator();
+    while (outputIterator.hasNext()) {
+      Map.Entry<String, LogicalOutput> entry = outputIterator.next();
+      String destVertexName = entry.getKey();
+      outputIterator.remove();
+      try {
+        ((OutputFrameworkInterface) entry.getValue()).close();
+        maybeResetInterruptStatus();
+      } catch (InterruptedException ie) {
+        //reset the status
+        LOG.info("Resetting interrupt status for output with destVertexName={}",
+            destVertexName);
+        Thread.currentThread().interrupt();
+      } catch (Throwable e) {
+        LOG.warn(
+            "Ignoring exception when closing output {}(cleanup). Exception class={}, message={}",
+            destVertexName, e.getClass().getName(), e.getMessage(), e);
+      } finally {
+        LOG.info("Close input for vertex={}, sourceVertex={}, interruptedStatus={}", processor
+            .getContext().getTaskVertexName(), destVertexName, Thread.currentThread()
+            .isInterrupted());
       }
-    } catch (Throwable e) {
-      LOG.warn(Throwables.getStackTraceAsString(e));
     }
 
     if (LOG.isDebugEnabled()) {

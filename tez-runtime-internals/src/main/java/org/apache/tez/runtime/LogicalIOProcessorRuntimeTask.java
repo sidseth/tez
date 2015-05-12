@@ -818,8 +818,8 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
       try {
         srcVertexItr.remove();
 
-        ((InputFrameworkInterface) initializedInputs.get(srcVertexName)).close();
         initializedInputs.remove(srcVertexName);
+        ((InputFrameworkInterface) initializedInputs.get(srcVertexName)).close();
 
         maybeResetInterruptStatus();
       } catch (InterruptedException ie) {
@@ -844,8 +844,8 @@ public class LogicalIOProcessorRuntimeTask extends RuntimeTask {
         try {
           outVertexItr.remove();
 
-          ((OutputFrameworkInterface) initializedOutputs.get(destVertexName)).close();
           initializedOutputs.remove(destVertexName);
+          ((OutputFrameworkInterface) initializedOutputs.get(destVertexName)).close();
 
           maybeResetInterruptStatus();
         } catch (InterruptedException ie) {

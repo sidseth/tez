@@ -733,6 +733,8 @@ public class VertexImpl implements org.apache.tez.dag.app.dag.Vertex, EventHandl
   private final List<OutputSpec> additionalOutputSpecs = new ArrayList<OutputSpec>();
   private Set<String> inputsWithInitializers;
   private int numInitializedInputs;
+  @VisibleForTesting
+  int numInitializerCompletionsHandled = 0;
   private boolean startSignalPending = false;
   // We may always store task events in the vertex for scalability
   List<TezEvent> pendingTaskEvents = Lists.newLinkedList();
@@ -3410,6 +3412,7 @@ public class VertexImpl implements org.apache.tez.dag.app.dag.Vertex, EventHandl
 
     @Override
     public VertexState transition(VertexImpl vertex, VertexEvent event) {
+      vertex.numInitializerCompletionsHandled++;
       VertexEventInputDataInformation iEvent = (VertexEventInputDataInformation) event;
       List<TezEvent> inputInfoEvents = iEvent.getEvents();
       try {
@@ -3426,8 +3429,9 @@ public class VertexImpl implements org.apache.tez.dag.app.dag.Vertex, EventHandl
 
       // done. check if we need to do the initialization
       if (vertex.getState() == VertexState.INITIALIZING && vertex.initWaitsForRootInitializers) {
-        if (vertex.numInitializedInputs == vertex.inputsWithInitializers.size()) {
-          // set the wait flag to false if all initializers are done
+        if (vertex.numInitializedInputs == vertex.inputsWithInitializers.size()
+            && vertex.numInitializerCompletionsHandled == vertex.inputsWithInitializers.size()) {
+          // set the wait flag to false if all initializers are done and InputDataInformation are received from VM
           vertex.initWaitsForRootInitializers = false;
         }
         // initialize vertex if possible and needed

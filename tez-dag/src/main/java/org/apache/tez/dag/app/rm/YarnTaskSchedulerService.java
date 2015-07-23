@@ -37,6 +37,10 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.tez.serviceplugins.api.TaskScheduler;
+import org.apache.tez.serviceplugins.api.TaskSchedulerContext;
+import org.apache.tez.serviceplugins.api.TaskSchedulerContext.AMState;
+import org.apache.tez.serviceplugins.api.TaskSchedulerContext.AppFinalStatus;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.commons.math3.random.RandomDataGenerator;
@@ -59,10 +63,7 @@ import org.apache.hadoop.yarn.util.resource.Resources;
 import org.apache.tez.serviceplugins.api.TaskAttemptEndReason;
 import org.apache.tez.dag.api.TezConfiguration;
 import org.apache.tez.dag.api.TezUncheckedException;
-import org.apache.tez.dag.app.AppContext;
-import org.apache.tez.dag.app.DAGAppMasterState;
-import org.apache.tez.dag.app.rm.TaskSchedulerService.TaskSchedulerAppCallback.AppFinalStatus;
-import org.apache.tez.dag.app.rm.container.ContainerSignatureMatcher;
+import org.apache.tez.common.ContainerSignatureMatcher;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
@@ -80,17 +81,14 @@ import com.google.common.util.concurrent.ThreadFactoryBuilder;
       eventHandler.handle(new AMNodeEventNodeCountUpdated(clusterNmCount));
     }
  */
-public class YarnTaskSchedulerService extends TaskSchedulerService
+public class YarnTaskSchedulerService extends TaskScheduler
                              implements AMRMClientAsync.CallbackHandler {
   private static final Logger LOG = LoggerFactory.getLogger(YarnTaskSchedulerService.class);
 
 
 
   final TezAMRMClientAsync<CookieContainerRequest> amRmClient;
-  final TaskSchedulerAppCallback realAppClient;
-  final TaskSchedulerAppCallback appClientDelegate;
   final ContainerSignatureMatcher containerSignatureMatcher;
-  ExecutorService appCallbackExecutor;
 
   // Container Re-Use configuration
   private boolean shouldReuseContainers;
@@ -131,7 +129,6 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   final String appHostName;
   final int appHostPort;
   final String appTrackingUrl;
-  final AppContext appContext;
   private AtomicBoolean hasUnregistered = new AtomicBoolean(false);
 
   AtomicBoolean isStopped = new AtomicBoolean(false);
@@ -150,6 +147,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   Set<ContainerId> sessionMinHeldContainers = Sets.newHashSet();
   
   RandomDataGenerator random = new RandomDataGenerator();
+  private final Configuration conf;
 
   @VisibleForTesting
   protected AtomicBoolean shouldUnregister = new AtomicBoolean(false);
@@ -213,51 +211,29 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
     }
   }
 
-  public YarnTaskSchedulerService(TaskSchedulerAppCallback appClient,
-                        ContainerSignatureMatcher containerSignatureMatcher,
-                        String appHostName,
-                        int appHostPort,
-                        String appTrackingUrl,
-                        AppContext appContext) {
-    super(YarnTaskSchedulerService.class.getName());
-    this.realAppClient = appClient;
-    this.appCallbackExecutor = createAppCallbackExecutorService();
-    this.containerSignatureMatcher = containerSignatureMatcher;
-    this.appClientDelegate = createAppCallbackDelegate(appClient);
+  public YarnTaskSchedulerService(TaskSchedulerContext taskSchedulerContext) {
+    super(taskSchedulerContext);
+    this.containerSignatureMatcher = taskSchedulerContext.getContainerSignatureMatcher();
     this.amRmClient = TezAMRMClientAsync.createAMRMClientAsync(1000, this);
-    this.appHostName = appHostName;
-    this.appHostPort = appHostPort;
-    this.appTrackingUrl = appTrackingUrl;
-    this.appContext = appContext;
+    this.appHostName = taskSchedulerContext.getAppHostName();
+    this.appHostPort = taskSchedulerContext.getAppClientPort();
+    this.appTrackingUrl = taskSchedulerContext.getAppTrackingUrl();
+    this.conf = taskSchedulerContext.getInitialConfiguration();
   }
 
   @Private
   @VisibleForTesting
-  YarnTaskSchedulerService(TaskSchedulerAppCallback appClient,
-      ContainerSignatureMatcher containerSignatureMatcher,
-      String appHostName,
-      int appHostPort,
-      String appTrackingUrl,
-      TezAMRMClientAsync<CookieContainerRequest> client,
-      AppContext appContext) {
-    super(YarnTaskSchedulerService.class.getName());
-    this.realAppClient = appClient;
-    this.appCallbackExecutor = createAppCallbackExecutorService();
-    this.containerSignatureMatcher = containerSignatureMatcher;
-    this.appClientDelegate = createAppCallbackDelegate(appClient);
+  YarnTaskSchedulerService(TaskSchedulerContext taskSchedulerContext,
+      TezAMRMClientAsync<CookieContainerRequest> client) {
+    super(taskSchedulerContext);
+    this.containerSignatureMatcher = taskSchedulerContext.getContainerSignatureMatcher();
     this.amRmClient = client;
-    this.appHostName = appHostName;
-    this.appHostPort = appHostPort;
-    this.appTrackingUrl = appTrackingUrl;
-    this.appContext = appContext;
+    this.appHostName = taskSchedulerContext.getAppHostName();
+    this.appHostPort = taskSchedulerContext.getAppClientPort();
+    this.appTrackingUrl = taskSchedulerContext.getAppTrackingUrl();
+    this.conf = taskSchedulerContext.getInitialConfiguration();
   }
 
-  @VisibleForTesting
-  ExecutorService createAppCallbackExecutorService() {
-    return Executors.newSingleThreadExecutor(new ThreadFactoryBuilder()
-        .setNameFormat("TaskSchedulerAppCaller #%d").setDaemon(true).build());
-  }
-  
   @Override
   public Resource getAvailableResources() {
     return amRmClient.getAvailableResources();
@@ -267,12 +243,6 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   public int getClusterNodeCount() {
     // this can potentially be cheaper after YARN-1722
     return amRmClient.getClusterNodeCount();
-  }
-
-  TaskSchedulerAppCallback createAppCallbackDelegate(
-      TaskSchedulerAppCallback realAppClient) {
-    return new TaskSchedulerAppCallbackWrapper(realAppClient,
-        appCallbackExecutor);
   }
 
   @Override
@@ -287,8 +257,9 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
 
   // AbstractService methods
   @Override
-  public synchronized void serviceInit(Configuration conf) {
+  public synchronized void initialize() {
 
+    // TODO Post TEZ-2003. Make all of these final fields.
     amRmClient.init(conf);
     int heartbeatIntervalMax = conf.getInt(
         TezConfiguration.TEZ_AM_RM_HEARTBEAT_INTERVAL_MS_MAX,
@@ -361,7 +332,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   }
 
   @Override
-  public void serviceStart() {
+  public void start() {
     try {
       RegisterApplicationMasterResponse response;
       synchronized (this) {
@@ -371,7 +342,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
                                                         appTrackingUrl);
       }
       // upcall to app outside locks
-      appClientDelegate.setApplicationRegistrationData(
+      getContext().setApplicationRegistrationData(
           response.getMaximumResourceCapability(),
           response.getApplicationACLs(),
           response.getClientToAMTokenMasterKey());
@@ -387,7 +358,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   }
 
   @Override
-  public void serviceStop() throws InterruptedException {
+  public void shutdown() throws InterruptedException {
     // upcall to app outside of locks
     try {
       delayedContainerManager.shutdown();
@@ -396,7 +367,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
       synchronized (this) {
         isStopped.set(true);
         if (shouldUnregister.get()) {
-          AppFinalStatus status = appClientDelegate.getFinalAppStatus();
+          AppFinalStatus status = getContext().getFinalAppStatus();
           LOG.info("Unregistering application from RM"
               + ", exitStatus=" + status.exitStatus
               + ", exitMessage=" + status.exitMessage
@@ -413,8 +384,6 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
       // operation and at the same time the callback operation might be trying
       // to get our lock.
       amRmClient.stop();
-      appCallbackExecutor.shutdown();
-      appCallbackExecutor.awaitTermination(1000l, TimeUnit.MILLISECONDS);
     } catch (YarnException e) {
       LOG.error("Yarn Exception while unregistering ", e);
       throw new TezUncheckedException(e);
@@ -478,7 +447,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
 
     // upcall to app must be outside locks
     for (Entry<Object, ContainerStatus> entry : appContainerStatus.entrySet()) {
-      appClientDelegate.containerCompleted(entry.getKey(), entry.getValue());
+      getContext().containerCompleted(entry.getKey(), entry.getValue());
     }
   }
 
@@ -528,7 +497,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   private synchronized Map<CookieContainerRequest, Container>
       assignNewlyAllocatedContainers(Iterable<Container> containers) {
 
-    boolean amInCompletionState = appContext.isAMInCompletionState();
+    boolean amInCompletionState = (getContext().getAMState() == AMState.COMPLETED);
     Map<CookieContainerRequest, Container> assignedContainers =
         new HashMap<CookieContainerRequest, Container>();
 
@@ -550,7 +519,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   private synchronized Map<CookieContainerRequest, Container>
       tryAssignReUsedContainers(Iterable<Container> containers) {
 
-    boolean amInCompletionState = appContext.isAMInCompletionState();
+    boolean amInCompletionState = (getContext().getAMState() == AMState.COMPLETED);
     Map<CookieContainerRequest, Container> assignedContainers =
       new HashMap<CookieContainerRequest, Container>();
 
@@ -590,7 +559,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
   private synchronized Map<CookieContainerRequest, Container>
       assignDelayedContainer(HeldContainer heldContainer) {
 
-    DAGAppMasterState state = appContext.getAMState();
+    AMState state = getContext().getAMState();
 
     boolean isNew = heldContainer.isNew();
     if (LOG.isDebugEnabled()) {
@@ -606,13 +575,13 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
         + ", isNew=" + isNew);
     }
 
-    if (state.equals(DAGAppMasterState.IDLE) || taskRequests.isEmpty()) {
+    if (state.equals(AMState.IDLE) || taskRequests.isEmpty()) {
       // reset locality level on held container
       // if sessionDelay defined, push back into delayed queue if not already
       // done so
 
       // Compute min held containers.
-      if (appContext.isSession() && sessionNumMinHeldContainers > 0 &&
+      if (getContext().isSession() && sessionNumMinHeldContainers > 0 &&
           sessionMinHeldContainers.isEmpty()) {
         // session mode and need to hold onto containers and not done so already
         determineMinHeldContainers();
@@ -626,7 +595,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
           && idleContainerTimeoutMin != -1)) {
         // container idle timeout has expired or is a new unused container. 
         // new container is possibly a spurious race condition allocation.
-        if (appContext.isSession()
+        if (getContext().isSession()
             && sessionMinHeldContainers.contains(heldContainer.getContainer().getId())) {
           // There are no outstanding requests. So its safe to hold new containers.
           // We may have received more containers than necessary and some are unused
@@ -667,7 +636,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
             heldContainer.getContainer(), currentTime
                 + localitySchedulingDelay);        
       }
-    } else if (state.equals(DAGAppMasterState.RUNNING)) {
+    } else if (state.equals(AMState.RUNNING_APP)) {
       // clear min held containers since we need to allocate to tasks
       if (!sessionMinHeldContainers.isEmpty()) {
         // update the expire time of min held containers so that they are
@@ -806,12 +775,12 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
             // Are there any pending requests at any priority?
             // release if there are tasks or this is not a session
             if (safeToRelease && 
-                (!taskRequests.isEmpty() || !appContext.isSession())) {
+                (!taskRequests.isEmpty() || !getContext().isSession())) {
               LOG.info("Releasing held container as either there are pending but "
                 + " unmatched requests or this is not a session"
                 + ", containerId=" + heldContainer.container.getId()
                 + ", pendingTasks=" + taskRequests.size()
-                + ", isSession=" + appContext.isSession()
+                + ", isSession=" + getContext().isSession()
                 + ". isNew=" + isNew);
               releaseUnassignedContainers(
                 Lists.newArrayList(heldContainer.container));
@@ -862,7 +831,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
       return;
     }
     // upcall to app must be outside locks
-    appClientDelegate.appShutdownRequested();
+    getContext().appShutdownRequested();
   }
 
   @Override
@@ -872,7 +841,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
     }
     // ignore bad nodes for now
     // upcall to app must be outside locks
-    appClientDelegate.nodesUpdated(updatedNodes);
+    getContext().nodesUpdated(updatedNodes);
   }
 
   @Override
@@ -894,7 +863,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
     numHeartbeats++;
     preemptIfNeeded();
 
-    return appClientDelegate.getProgress();
+    return getContext().getProgress();
   }
 
   @Override
@@ -902,7 +871,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
     if (isStopped.get()) {
       return;
     }
-    appClientDelegate.onError(t);
+    getContext().onError(t);
   }
 
   @Override
@@ -1289,7 +1258,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
         ContainerId cId = preemptedContainers[i];
         if (cId != null) {
           LOG.info("Preempting container: " + cId + " currently allocated to a task.");
-          appClientDelegate.preemptContainer(cId);
+          getContext().preemptContainer(cId);
         }
       }
     }
@@ -1422,7 +1391,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
     Object assignedTask = containerAssignments.remove(containerId);
     if (assignedTask != null) {
       // A task was assigned to this container at some point. Inform the app.
-      appClientDelegate.containerBeingReleased(containerId);
+      getContext().containerBeingReleased(containerId);
     }
     HeldContainer delayedContainer = heldContainers.remove(containerId);
     if (delayedContainer != null) {
@@ -1626,7 +1595,7 @@ public class YarnTaskSchedulerService extends TaskSchedulerService
 
   private void informAppAboutAssignment(CookieContainerRequest assigned,
       Container container) {
-    appClientDelegate.taskAllocated(getTask(assigned),
+    getContext().taskAllocated(getTask(assigned),
         assigned.getCookie().getAppCookie(), container);
   }
 

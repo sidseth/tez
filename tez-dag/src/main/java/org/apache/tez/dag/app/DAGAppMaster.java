@@ -1046,8 +1046,8 @@ public class DAGAppMaster extends AbstractService {
                                                           String[] taskCommunicatorClasses,
                                                           boolean isLocal) {
     TaskAttemptListener lis =
-        new TaskAttemptListenerImpTezDag(context, thh, chh, jobTokenSecretManager,
-            taskCommunicatorClasses, isLocal);
+        new TaskAttemptListenerImpTezDag(context, thh, chh,
+            taskCommunicatorClasses, amConf, isLocal);
     return lis;
   }
 

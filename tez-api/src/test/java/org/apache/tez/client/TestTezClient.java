@@ -26,6 +26,11 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import javax.annotation.Nullable;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.RETURNS_DEEP_STUBS;
 import static org.mockito.Mockito.mock;
@@ -61,6 +66,7 @@ import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.GetAMStatusRespo
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.ShutdownSessionRequestProto;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.SubmitDAGRequestProto;
 import org.apache.tez.dag.api.client.rpc.DAGClientAMProtocolRPC.TezAppMasterStatusProto;
+import org.apache.tez.serviceplugins.api.ServicePluginsDescriptor;
 import org.hamcrest.CoreMatchers;
 import org.junit.Assert;
 import org.junit.Test;
@@ -153,11 +159,11 @@ public class TestTezClient {
       verify(client.mockYarnClient, times(1)).submitApplication(captor.capture());
       ApplicationSubmissionContext context = captor.getValue();
       Assert.assertEquals(3, context.getAMContainerSpec().getLocalResources().size());
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_AM_LOCAL_RESOURCES_PB_FILE_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_PB_BINARY_CONF_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           lrName1));
     } else {
       verify(client.mockYarnClient, times(0)).submitApplication(captor.capture());
@@ -172,7 +178,7 @@ public class TestTezClient {
     DAG dag = DAG.create("DAG").addVertex(vertex).addTaskLocalFiles(lrDAG);
     DAGClient dagClient = client.submitDAG(dag);
         
-    Assert.assertTrue(dagClient.getExecutionContext().contains(client.mockAppId.toString()));
+    assertTrue(dagClient.getExecutionContext().contains(client.mockAppId.toString()));
     
     if (isSession) {
       verify(client.mockYarnClient, times(1)).submitApplication(captor.capture());
@@ -181,13 +187,13 @@ public class TestTezClient {
       verify(client.mockYarnClient, times(1)).submitApplication(captor.capture());
       ApplicationSubmissionContext context = captor.getValue();
       Assert.assertEquals(4, context.getAMContainerSpec().getLocalResources().size());
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_AM_LOCAL_RESOURCES_PB_FILE_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_PB_BINARY_CONF_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_PB_PLAN_BINARY_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           lrName1));
     }
     
@@ -211,7 +217,7 @@ public class TestTezClient {
     if (isSession) {
       // same app master
       verify(client.mockYarnClient, times(1)).submitApplication(captor.capture());
-      Assert.assertTrue(dagClient.getExecutionContext().contains(client.mockAppId.toString()));
+      assertTrue(dagClient.getExecutionContext().contains(client.mockAppId.toString()));
       // additional resource is sent
       ArgumentCaptor<SubmitDAGRequestProto> captor1 = ArgumentCaptor.forClass(SubmitDAGRequestProto.class);
       verify(client.sessionAmProxy, times(2)).submitDAG((RpcController)any(), captor1.capture());
@@ -220,20 +226,20 @@ public class TestTezClient {
       Assert.assertEquals(lrName2, proto.getAdditionalAmResources().getLocalResources(0).getName());
     } else {
       // new app master
-      Assert.assertTrue(dagClient.getExecutionContext().contains(appId2.toString()));
+      assertTrue(dagClient.getExecutionContext().contains(appId2.toString()));
       verify(client.mockYarnClient, times(2)).submitApplication(captor.capture());
       // additional resource is added
       ApplicationSubmissionContext context = captor.getValue();
       Assert.assertEquals(5, context.getAMContainerSpec().getLocalResources().size());
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_AM_LOCAL_RESOURCES_PB_FILE_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_PB_BINARY_CONF_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           TezConstants.TEZ_PB_PLAN_BINARY_NAME));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           lrName1));
-      Assert.assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
+      assertTrue(context.getAMContainerSpec().getLocalResources().containsKey(
           lrName2));
     }
     
@@ -263,7 +269,7 @@ public class TestTezClient {
     ArgumentCaptor<SubmitDAGRequestProto> captor1 = ArgumentCaptor.forClass(SubmitDAGRequestProto.class);
     verify(client.sessionAmProxy, times(1)).submitDAG((RpcController)any(), captor1.capture());
     SubmitDAGRequestProto proto = captor1.getValue();
-    Assert.assertTrue(proto.getDAGPlan().getName().startsWith(TezConstants.TEZ_PREWARM_DAG_NAME_PREFIX));
+    assertTrue(proto.getDAGPlan().getName().startsWith(TezConstants.TEZ_PREWARM_DAG_NAME_PREFIX));
 
     client.stop();
   }
@@ -330,7 +336,7 @@ public class TestTezClient {
     thread.join(250);
     thread.interrupt();
     thread.join();
-    Assert.assertThat(exceptionReference.get(),CoreMatchers. instanceOf(InterruptedException.class));
+    Assert.assertThat(exceptionReference.get(), CoreMatchers.instanceOf(InterruptedException.class));
     client.stop();
   }
   
@@ -347,7 +353,7 @@ public class TestTezClient {
       client.waitTillReady();
       Assert.fail();
     } catch (SessionNotRunning e) {
-      Assert.assertTrue(e.getMessage().contains(msg));
+      assertTrue(e.getMessage().contains(msg));
     }
     client.stop();
   }
@@ -362,7 +368,7 @@ public class TestTezClient {
       client.waitTillReady();
       Assert.fail();
     } catch (SessionNotRunning e) {
-      Assert.assertTrue(e.getMessage().contains(TezClient.NO_CLUSTER_DIAGNOSTICS_MSG));
+      assertTrue(e.getMessage().contains(TezClient.NO_CLUSTER_DIAGNOSTICS_MSG));
     }
     client.stop();
   }
@@ -387,9 +393,76 @@ public class TestTezClient {
       client.submitDAG(dag);
       Assert.fail();
     } catch (SessionNotRunning e) {
-      Assert.assertTrue(e.getMessage().contains(msg));
+      assertTrue(e.getMessage().contains(msg));
     }
     client.stop();
+  }
+
+  @Test(timeout = 5000)
+  public void testClientBuilder() {
+    TezConfiguration tezConfWitSession = new TezConfiguration();
+    tezConfWitSession.setBoolean(TezConfiguration.TEZ_AM_SESSION_MODE, true);
+
+    TezConfiguration tezConfNoSession = new TezConfiguration();
+    tezConfNoSession.setBoolean(TezConfiguration.TEZ_AM_SESSION_MODE, false);
+
+    AMConfiguration amConf;
+    TezClient tezClient;
+    Credentials credentials = new Credentials();
+    Map<String, LocalResource> localResourceMap = new HashMap<>();
+    localResourceMap.put("testResource", mock(LocalResource.class));
+    ServicePluginsDescriptor servicePluginsDescriptor = ServicePluginsDescriptor.create(true);
+
+    // Session mode via conf
+    tezClient = TezClient.newBuilder("client", tezConfWitSession).build();
+    assertTrue(tezClient.isSession);
+    assertNull(tezClient.servicePluginsDescriptor);
+    assertNotNull(tezClient.apiVersionInfo);
+    amConf = tezClient.amConfig;
+    assertNotNull(amConf);
+    assertEquals(0, amConf.getAMLocalResources().size());
+    assertNull(amConf.getCredentials());
+    assertTrue(
+        amConf.getTezConfiguration().getBoolean(TezConfiguration.TEZ_AM_SESSION_MODE, false));
+
+    // Non-Session mode via conf
+    tezClient = TezClient.newBuilder("client", tezConfNoSession).build();
+    assertFalse(tezClient.isSession);
+    assertNull(tezClient.servicePluginsDescriptor);
+    assertNotNull(tezClient.apiVersionInfo);
+    amConf = tezClient.amConfig;
+    assertNotNull(amConf);
+    assertEquals(0, amConf.getAMLocalResources().size());
+    assertNull(amConf.getCredentials());
+    assertFalse(
+        amConf.getTezConfiguration().getBoolean(TezConfiguration.TEZ_AM_SESSION_MODE, true));
+
+    // no-session via config. API explicit session.
+    tezClient = TezClient.newBuilder("client", tezConfNoSession).setIsSession(true).build();
+    assertTrue(tezClient.isSession);
+    assertNull(tezClient.servicePluginsDescriptor);
+    assertNotNull(tezClient.apiVersionInfo);
+    amConf = tezClient.amConfig;
+    assertNotNull(amConf);
+    assertEquals(0, amConf.getAMLocalResources().size());
+    assertNull(amConf.getCredentials());
+    assertTrue(
+        amConf.getTezConfiguration().getBoolean(TezConfiguration.TEZ_AM_SESSION_MODE, false));
+
+    // Plugins, credentials, local resources
+    tezClient = TezClient.newBuilder("client", tezConfWitSession).setCredentials(credentials)
+        .setLocalResources(localResourceMap).setServicePluginDescriptor(servicePluginsDescriptor)
+        .build();
+    assertTrue(tezClient.isSession);
+    assertEquals(servicePluginsDescriptor, tezClient.servicePluginsDescriptor);
+    assertNotNull(tezClient.apiVersionInfo);
+    amConf = tezClient.amConfig;
+    assertNotNull(amConf);
+    assertEquals(1, amConf.getAMLocalResources().size());
+    assertEquals(localResourceMap, amConf.getAMLocalResources());
+    assertEquals(credentials, amConf.getCredentials());
+    assertTrue(
+        amConf.getTezConfiguration().getBoolean(TezConfiguration.TEZ_AM_SESSION_MODE, false));
   }
 
 }

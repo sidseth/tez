@@ -34,6 +34,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
+import com.google.common.collect.Lists;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.security.Credentials;
@@ -52,7 +53,9 @@ import org.apache.tez.common.security.JobTokenIdentifier;
 import org.apache.tez.common.security.JobTokenSecretManager;
 import org.apache.tez.common.security.TokenCache;
 import org.apache.tez.dag.api.NamedEntityDescriptor;
+import org.apache.tez.dag.api.TaskCommunicator;
 import org.apache.tez.dag.api.TezConfiguration;
+import org.apache.tez.dag.api.TezConstants;
 import org.apache.tez.dag.api.TezUncheckedException;
 import org.apache.tez.dag.api.UserPayload;
 import org.apache.tez.serviceplugins.api.ContainerEndReason;
@@ -143,7 +146,10 @@ public class TestTaskAttemptListenerImplTezDag {
       throw new TezUncheckedException(e);
     }
     taskAttemptListener = new TaskAttemptListenerImplForTest(appContext,
-        mock(TaskHeartbeatHandler.class), mock(ContainerHeartbeatHandler.class), null, defaultPayload, false);
+        mock(TaskHeartbeatHandler.class), mock(ContainerHeartbeatHandler.class),
+        Lists.newArrayList(
+            new NamedEntityDescriptor(TezConstants.getTezYarnServicePluginName(), null)
+                .setUserPayload(defaultPayload)));
 
     taskSpec = mock(TaskSpec.class);
     doReturn(taskAttemptID).when(taskSpec).getTaskAttemptID();
@@ -296,7 +302,7 @@ public class TestTaskAttemptListenerImplTezDag {
 
   // TODO TEZ-2003 Move this into TestTezTaskCommunicator. Potentially other tests as well.
   @Test (timeout= 5000)
-  public void testPortRange_NotSpecified() {
+  public void testPortRange_NotSpecified() throws IOException {
     Configuration conf = new Configuration();
     JobTokenIdentifier identifier = new JobTokenIdentifier(new Text(
         "fakeIdentifier"));
@@ -304,14 +310,11 @@ public class TestTaskAttemptListenerImplTezDag {
         new JobTokenSecretManager());
     sessionToken.setService(identifier.getJobId());
     TokenCache.setSessionToken(sessionToken, credentials);
-    UserPayload userPayload = null;
-    try {
-      userPayload = TezUtils.createUserPayloadFromConf(conf);
-    } catch (IOException e) {
-      throw new TezUncheckedException(e);
-    }
+    UserPayload userPayload = TezUtils.createUserPayloadFromConf(conf);
     taskAttemptListener = new TaskAttemptListenerImpTezDag(appContext,
-        mock(TaskHeartbeatHandler.class), mock(ContainerHeartbeatHandler.class), null, userPayload, false);
+        mock(TaskHeartbeatHandler.class), mock(ContainerHeartbeatHandler.class), Lists.newArrayList(
+        new NamedEntityDescriptor(TezConstants.getTezYarnServicePluginName(), null)
+            .setUserPayload(userPayload)));
     // no exception happen, should started properly
     taskAttemptListener.init(conf);
     taskAttemptListener.start();
@@ -330,14 +333,12 @@ public class TestTaskAttemptListenerImplTezDag {
       TokenCache.setSessionToken(sessionToken, credentials);
 
       conf.set(TezConfiguration.TEZ_AM_TASK_AM_PORT_RANGE, port + "-" + port);
-      UserPayload userPayload = null;
-      try {
-        userPayload = TezUtils.createUserPayloadFromConf(conf);
-      } catch (IOException e) {
-        throw new TezUncheckedException(e);
-      }
+      UserPayload userPayload = TezUtils.createUserPayloadFromConf(conf);
+
       taskAttemptListener = new TaskAttemptListenerImpTezDag(appContext,
-          mock(TaskHeartbeatHandler.class), mock(ContainerHeartbeatHandler.class), null, userPayload, false);
+          mock(TaskHeartbeatHandler.class), mock(ContainerHeartbeatHandler.class), Lists
+          .newArrayList(new NamedEntityDescriptor(TezConstants.getTezYarnServicePluginName(), null)
+              .setUserPayload(userPayload)));
       taskAttemptListener.init(conf);
       taskAttemptListener.start();
       int resultedPort = taskAttemptListener.getTaskCommunicator(0).getAddress().getPort();
@@ -393,16 +394,13 @@ public class TestTaskAttemptListenerImplTezDag {
     public TaskAttemptListenerImplForTest(AppContext context,
                                           TaskHeartbeatHandler thh,
                                           ContainerHeartbeatHandler chh,
-                                          List<NamedEntityDescriptor> taskCommDescriptors,
-                                          UserPayload userPayload,
-                                          boolean isPureLocalMode) {
-      super(context, thh, chh, taskCommDescriptors, userPayload,
-          isPureLocalMode);
+                                          List<NamedEntityDescriptor> taskCommDescriptors) {
+      super(context, thh, chh, taskCommDescriptors);
     }
 
     @Override
-    protected TezTaskCommunicatorImpl createTezTaskCommunicator(TaskCommunicatorContext context) {
-      return new TezTaskCommunicatorImplForTest(context);
+    TaskCommunicator createDefaultTaskCommunicator(TaskCommunicatorContext taskCommunicatorContext) {
+      return new TezTaskCommunicatorImplForTest(taskCommunicatorContext);
     }
 
   }

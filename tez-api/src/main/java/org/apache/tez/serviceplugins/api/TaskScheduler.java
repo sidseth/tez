@@ -14,6 +14,8 @@
 
 package org.apache.tez.serviceplugins.api;
 
+import javax.annotation.Nullable;
+
 import org.apache.hadoop.classification.InterfaceAudience;
 import org.apache.hadoop.classification.InterfaceStability;
 import org.apache.hadoop.yarn.api.records.Container;
@@ -178,11 +180,13 @@ public abstract class TaskScheduler implements ServicePluginLifecycle {
    * @param task          the task being de-allocated.
    * @param taskSucceeded whether the task succeeded or not
    * @param endReason     the reason for the task failure
+   * @param diagnostics   additional diagnostics information which may be relevant
    * @return true if the task was associated with a container, false if the task was not associated
    * with a container
    */
   public abstract boolean deallocateTask(Object task, boolean taskSucceeded,
-                                         TaskAttemptEndReason endReason);
+                                         TaskAttemptEndReason endReason,
+                                         @Nullable String diagnostics);
 
   /**
    * A request to de-allocate a previously allocated container.
